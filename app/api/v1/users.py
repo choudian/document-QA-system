@@ -10,6 +10,7 @@ from app.models.user import User
 from app.models.tenant import Tenant
 from app.schemas.user import UserCreate, UserUpdate, UserResponse
 from app.core.security import password_hasher
+from app.core.permissions import require_permission
 
 router = APIRouter()
 
@@ -18,7 +19,8 @@ router = APIRouter()
 def create_user(
     user: UserCreate,
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_user)
+    current_user = Depends(get_current_user),
+    _ = Depends(require_permission("system:user:create"))
 ):
     """
     创建用户
@@ -98,7 +100,8 @@ def list_users(
     limit: int = 100,
     status: Optional[str] = None,
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_user)
+    current_user = Depends(get_current_user),
+    _ = Depends(require_permission("system:user:read"))
 ):
     """
     查询用户列表
@@ -143,7 +146,8 @@ def list_users(
 def get_user(
     user_id: str,
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_user)
+    current_user = Depends(get_current_user),
+    _ = Depends(require_permission("system:user:read"))
 ):
     """
     查询单个用户
@@ -172,7 +176,8 @@ def update_user(
     user_id: str,
     user_update: UserUpdate,
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_user)
+    current_user = Depends(get_current_user),
+    _ = Depends(require_permission("system:user:update"))
 ):
     """
     更新用户
@@ -244,7 +249,8 @@ def update_user(
 def delete_user(
     user_id: str,
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_user)
+    current_user = Depends(get_current_user),
+    _ = Depends(require_permission("system:user:delete"))
 ):
     """
     删除用户
@@ -275,7 +281,8 @@ def update_user_status(
     user_id: str,
     status: str,
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_user)
+    current_user = Depends(get_current_user),
+    _ = Depends(require_permission("system:user:update"))
 ):
     """
     启用/冻结用户

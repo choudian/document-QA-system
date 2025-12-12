@@ -18,6 +18,7 @@ from app.repositories.role_repository import RoleRepository
 from app.repositories.permission_repository import PermissionRepository
 from app.repositories.user_repository import UserRepository
 from app.services.role_service import RoleService
+from app.core.permissions import require_permission
 
 router = APIRouter()
 
@@ -26,7 +27,8 @@ router = APIRouter()
 def create_role(
     role: RoleCreate,
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_user)
+    current_user = Depends(get_current_user),
+    _ = Depends(require_permission("system:role:create"))
 ):
     """
     创建角色
@@ -57,7 +59,8 @@ def list_roles(
     limit: int = 100,
     status: Optional[bool] = None,
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_user)
+    current_user = Depends(get_current_user),
+    _ = Depends(require_permission("system:role:read"))
 ):
     """
     查询角色列表
@@ -92,7 +95,12 @@ def list_roles(
 
 
 @router.get("/{role_id}", response_model=RoleResponse)
-def get_role(role_id: str, db: Session = Depends(get_db)):
+def get_role(
+    role_id: str,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user),
+    _ = Depends(require_permission("system:role:read"))
+):
     """
     查询单个角色
     """
@@ -108,7 +116,9 @@ def get_role(role_id: str, db: Session = Depends(get_db)):
 def update_role(
     role_id: str,
     role_update: RoleUpdate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user),
+    _ = Depends(require_permission("system:role:update"))
 ):
     """
     更新角色
@@ -122,7 +132,12 @@ def update_role(
 
 
 @router.delete("/{role_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_role(role_id: str, db: Session = Depends(get_db)):
+def delete_role(
+    role_id: str,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user),
+    _ = Depends(require_permission("system:role:delete"))
+):
     """
     删除角色
     """
@@ -139,7 +154,9 @@ def delete_role(role_id: str, db: Session = Depends(get_db)):
 def update_role_status(
     role_id: str,
     status: bool,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user),
+    _ = Depends(require_permission("system:role:update"))
 ):
     """
     启用/停用角色
@@ -156,7 +173,9 @@ def update_role_status(
 def assign_permissions(
     role_id: str,
     payload: AssignPermissionsRequest,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user),
+    _ = Depends(require_permission("system:role:assign_permission"))
 ):
     """
     为角色分配权限
@@ -170,7 +189,12 @@ def assign_permissions(
 
 
 @router.get("/{role_id}/permissions", response_model=List[dict])
-def get_role_permissions(role_id: str, db: Session = Depends(get_db)):
+def get_role_permissions(
+    role_id: str,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user),
+    _ = Depends(require_permission("system:role:read"))
+):
     """
     获取角色的权限列表
     """
@@ -189,7 +213,9 @@ def get_role_permissions(role_id: str, db: Session = Depends(get_db)):
 def assign_roles_to_user(
     user_id: str,
     payload: AssignRolesRequest,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user),
+    _ = Depends(require_permission("system:user:assign_role"))
 ):
     """
     为用户分配角色
@@ -209,7 +235,9 @@ def assign_roles_to_user(
 def assign_users_to_role(
     role_id: str,
     payload: AssignUsersRequest,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user),
+    _ = Depends(require_permission("system:role:assign_user"))
 ):
     """
     为角色分配用户
@@ -223,7 +251,12 @@ def assign_users_to_role(
 
 
 @router.get("/{role_id}/users", response_model=List[dict])
-def get_role_users(role_id: str, db: Session = Depends(get_db)):
+def get_role_users(
+    role_id: str,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user),
+    _ = Depends(require_permission("system:role:read"))
+):
     """
     获取角色的用户列表
     """
