@@ -1,0 +1,29 @@
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+sqlalchemy==2.0.23
+pydantic==2.5.0
+pydantic-settings==2.1.0
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+bcrypt==3.2.2
+python-multipart==0.0.6
+alembic==1.12.1
+email-validator==2.1.0.post1
+
+# 数据库驱动（根据需要选择安装）
+# PostgreSQL
+psycopg2-binary==2.9.9
+
+# MySQL (选择其中一个)
+# PyMySQL
+# pymysql==1.1.0
+# mysqlclient (需要系统依赖)
+# mysqlclient==2.2.0
+
+# SQLite (Python内置，无需安装)
+
+# Oracle
+# cx_Oracle==8.3.0
+# 或者使用 oracledb (Oracle官方推荐)
+# oracledb==1.4.2
+
