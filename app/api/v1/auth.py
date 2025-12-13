@@ -7,7 +7,8 @@ from app.core.database import get_db
 from app.core.security import verify_token
 from app.schemas.auth import (
     LoginRequest, TokenResponse, RegisterRequest, ResetPasswordRequest,
-    ResetPasswordConfirmRequest, MFAEnableRequest, MFAVerifyRequest, MFAResponse
+    ResetPasswordConfirmRequest, MFAEnableRequest, MFAVerifyRequest, MFAResponse,
+    RefreshTokenRequest, RefreshTokenResponse
 )
 from app.services.auth_service import AuthService
 from app.repositories.user_repository import UserRepository
@@ -160,4 +161,51 @@ def verify_mfa(
     )
     auth_service.verify_mfa(user_id=user_id, code=payload.code)
     return {"message": "MFA 验证成功"}
+
+
+@router.post("/refresh", response_model=RefreshTokenResponse, status_code=status.HTTP_200_OK)
+def refresh_token(
+    payload: RefreshTokenRequest,
+    db: Session = Depends(get_db),
+):
+    """
+    刷新访问令牌（占位实现）
+    
+    注意：此功能为占位实现，实际实现需要验证 refresh token 并生成新的 access token
+    """
+    # 占位：验证 refresh token
+    payload_data = verify_token(payload.refresh_token)
+    if not payload_data:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="无效的 refresh token",
+        )
+    
+    user_id = payload_data.get("sub")
+    tenant_id = payload_data.get("tenant_id")
+    
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="refresh token 中缺少用户信息",
+        )
+    
+    # 占位：生成新的 access token
+    from app.core.security import create_access_token
+    new_access_token = create_access_token({
+        "sub": user_id,
+        "tenant_id": tenant_id,
+    })
+    
+    # TODO: 实际实现应该：
+    # 1. 验证 refresh token 是否有效且未过期
+    # 2. 检查 refresh token 是否已被撤销
+    # 3. 生成新的 access token 和 refresh token
+    # 4. 可选：撤销旧的 refresh token（单次使用）
+    
+    return RefreshTokenResponse(
+        access_token=new_access_token,
+        token_type="bearer",
+        refresh_token=None,  # 占位：实际应该返回新的 refresh token
+    )
 

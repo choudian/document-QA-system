@@ -53,3 +53,15 @@ class MFAResponse(BaseModel):
     enabled: bool
     secret: Optional[str] = None  # 仅首次启用时返回，用于显示二维码
     qr_code_url: Optional[str] = None  # 二维码 URL（如果支持）
+
+
+class RefreshTokenRequest(BaseModel):
+    """刷新 Token 请求"""
+    refresh_token: str = Field(..., description="刷新 Token")
+
+
+class RefreshTokenResponse(BaseModel):
+    """刷新 Token 响应"""
+    access_token: str
+    token_type: str = "bearer"
+    refresh_token: Optional[str] = None  # 新的刷新 Token（如果支持刷新）

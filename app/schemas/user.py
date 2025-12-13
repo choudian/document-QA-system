@@ -2,7 +2,7 @@
 用户Schema
 """
 from pydantic import BaseModel, Field, field_validator
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
 import re
 
@@ -67,3 +67,32 @@ class UserResponse(UserBase):
     class Config:
         from_attributes = True
 
+
+class UserInviteRequest(BaseModel):
+    """用户邀请请求"""
+    email: Optional[str] = Field(None, description="邮箱地址（可选）")
+    phone: str = Field(..., description="手机号")
+    username: Optional[str] = Field(None, description="用户名（可选，默认使用手机号）")
+    role_ids: Optional[List[str]] = Field(None, description="角色ID列表（可选）")
+
+
+class UserInviteResponse(BaseModel):
+    """用户邀请响应"""
+    invite_code: str = Field(..., description="邀请码")
+    invite_url: str = Field(..., description="邀请链接")
+    expires_at: str = Field(..., description="过期时间（ISO 格式）")
+
+
+class UserImportRequest(BaseModel):
+    """用户批量导入请求"""
+    file_url: Optional[str] = Field(None, description="文件URL（可选）")
+    file_content: Optional[str] = Field(None, description="文件内容（Base64编码，可选）")
+    file_type: str = Field("excel", description="文件类型：excel/csv")
+
+
+class UserImportResponse(BaseModel):
+    """用户批量导入响应"""
+    total: int = Field(..., description="总记录数")
+    success: int = Field(..., description="成功数")
+    failed: int = Field(..., description="失败数")
+    errors: List[dict] = Field(default_factory=list, description="错误详情")

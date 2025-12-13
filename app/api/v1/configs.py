@@ -14,6 +14,7 @@ from app.schemas.config import (
     ConfigDefinitionsResponse,
 )
 from pydantic import BaseModel, Field
+from typing import List
 from app.repositories.config_repository import ConfigRepository
 from app.services.config_service import ConfigService
 from app.core.permissions import require_permission
@@ -251,4 +252,137 @@ def update_config(
         service.update_tenant_config(current_user.tenant_id, payload, operator_id=current_user.id)
     
     return None
+
+
+class ProbeRequest(BaseModel):
+    """配置可用性探测请求"""
+    category: str = Field(..., description="配置类别：llm/embedding/rerank/vector_store")
+    key: str = Field("default", description="配置键")
+    scope: str = Field("system", description="配置作用域：system/tenant/user")
+    scope_id: Optional[str] = Field(None, description="作用域ID（租户ID或用户ID）")
+
+
+class ProbeResponse(BaseModel):
+    """配置可用性探测响应"""
+    available: bool
+    message: str
+    latency_ms: Optional[int] = None
+
+
+@router.post("/probe", response_model=ProbeResponse, status_code=status.HTTP_200_OK)
+def probe_config_availability(
+    payload: ProbeRequest,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+    _=Depends(require_permission("system:config:read")),
+):
+    """
+    探测配置可用性（占位实现）
+    
+    注意：此功能为占位实现，实际实现需要测试 API 连接、验证密钥等
+    """
+    import time
+    
+    start_time = time.time()
+    
+    try:
+        service = _build_service(db)
+        
+        # 获取配置
+        if payload.scope == "system":
+            configs = service.list_scope_configs("system", None)
+        elif payload.scope == "tenant":
+            scope_id = payload.scope_id or current_user.tenant_id
+            if not scope_id:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="租户级配置需要提供 tenant_id",
+                )
+            configs = service.list_scope_configs("tenant", scope_id)
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="暂不支持用户级配置探测",
+            )
+        
+        config_value = configs.get(payload.category, {}).get(payload.key)
+        if not config_value:
+            return ProbeResponse(
+                available=False,
+                message=f"配置 {payload.category}.{payload.key} 不存在",
+                latency_ms=int((time.time() - start_time) * 1000),
+            )
+        
+        # 占位：实际应该根据配置类型进行可用性检测
+        # 例如：LLM 配置应该测试 API 连接，向量库配置应该测试连接等
+        # TODO: 实现实际的可用性检测逻辑
+        
+        latency_ms = int((time.time() - start_time) * 1000)
+        
+        return ProbeResponse(
+            available=True,
+            message="配置可用性检测成功（占位实现）",
+            latency_ms=latency_ms,
+        )
+    except Exception as e:
+        return ProbeResponse(
+            available=False,
+            message=f"配置可用性检测失败: {str(e)}",
+            latency_ms=int((time.time() - start_time) * 1000) if 'start_time' in locals() else None,
+        )
+
+
+class ConfigCategoryResponse(BaseModel):
+    """配置分类响应"""
+    category: str = Field(..., description="分类名称")
+    label: str = Field(..., description="分类标签")
+    configs: List[str] = Field(..., description="配置项列表（category.key）")
+
+
+@router.get("/categories", response_model=List[ConfigCategoryResponse], status_code=status.HTTP_200_OK)
+def get_config_categories(
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+    _=Depends(require_permission("system:config:read")),
+):
+    """
+    获取配置项分类（占位实现）
+    
+    注意：此功能为占位实现，实际实现需要根据配置定义返回分类信息
+    """
+    # 占位：返回预定义的分类
+    # TODO: 实际实现应该：
+    # 1. 从配置定义中提取分类信息
+    # 2. 按分类分组配置项
+    # 3. 返回分类和对应的配置项列表
+    
+    categories = [
+        {
+            "category": "model",
+            "label": "模型相关",
+            "configs": ["llm.default", "rerank.default", "embedding.default"],
+        },
+        {
+            "category": "storage",
+            "label": "存储相关",
+            "configs": ["vector_store.default"],
+        },
+        {
+            "category": "document",
+            "label": "文档相关",
+            "configs": ["doc.upload", "doc.chunk"],
+        },
+        {
+            "category": "qa",
+            "label": "问答相关",
+            "configs": ["retrieval.default"],
+        },
+        {
+            "category": "system",
+            "label": "系统相关",
+            "configs": ["langfuse.default"],
+        },
+    ]
+    
+    return categories
 

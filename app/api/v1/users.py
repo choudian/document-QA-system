@@ -8,7 +8,11 @@ from app.core.database import get_db
 from app.api.v1.me import get_current_user
 from app.models.user import User
 from app.models.tenant import Tenant
-from app.schemas.user import UserCreate, UserUpdate, UserResponse
+from app.schemas.user import (
+    UserCreate, UserUpdate, UserResponse,
+    UserInviteRequest, UserInviteResponse,
+    UserImportRequest, UserImportResponse
+)
 from app.core.security import password_hasher
 from app.core.permissions import require_permission
 
@@ -313,4 +317,133 @@ def update_user_status(
     db.commit()
     db.refresh(user)
     return user
+
+
+@router.post("/invite", response_model=UserInviteResponse, status_code=status.HTTP_200_OK)
+def invite_user(
+    payload: UserInviteRequest,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user),
+    _ = Depends(require_permission("system:user:create")),
+):
+    """
+    邀请用户（占位实现）
+    
+    注意：此功能为占位实现，实际实现需要发送邀请邮件/短信
+    """
+    import secrets
+    import datetime
+    
+    invite_code = secrets.token_urlsafe(32)
+    invite_url = f"https://example.com/invite/{invite_code}"  # 占位URL
+    
+    expires_at = (datetime.datetime.now() + datetime.timedelta(days=7)).isoformat()
+    
+    # TODO: 实际实现应该：
+    # 1. 生成邀请记录并存储到数据库
+    # 2. 发送邀请邮件/短信
+    # 3. 设置过期时间
+    
+    return UserInviteResponse(
+        invite_code=invite_code,
+        invite_url=invite_url,
+        expires_at=expires_at,
+    )
+
+
+@router.post("/import", response_model=UserImportResponse, status_code=status.HTTP_200_OK)
+def import_users(
+    payload: UserImportRequest,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user),
+    _ = Depends(require_permission("system:user:create")),
+):
+    """
+    批量导入用户（占位实现）
+    
+    注意：此功能为占位实现，实际实现需要解析 Excel/CSV 文件
+    """
+    # 占位：返回空结果
+    # TODO: 实际实现应该：
+    # 1. 解析 Excel/CSV 文件
+    # 2. 验证数据格式
+    # 3. 批量创建用户
+    # 4. 返回导入结果
+    
+    return UserImportResponse(
+        total=0,
+        success=0,
+        failed=0,
+        errors=[],
+    )
+
+
+@router.post("/{user_id}/lock", status_code=status.HTTP_200_OK)
+def lock_user(
+    user_id: str,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user),
+    _ = Depends(require_permission("system:user:update")),
+):
+    """
+    锁定用户账户（占位实现）
+    
+    注意：此功能为占位实现，实际实现需要更新用户状态并记录锁定原因
+    """
+    from app.repositories.user_repository import UserRepository
+    
+    user_repo = UserRepository(db)
+    user = user_repo.get_by_id(user_id)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="用户不存在",
+        )
+    
+    # 占位：更新用户状态为冻结
+    user.status = "frozen"
+    user_repo.update(user)
+    user_repo.commit()
+    
+    # TODO: 实际实现应该：
+    # 1. 记录锁定原因
+    # 2. 记录锁定时间
+    # 3. 发送通知
+    
+    return {"message": "用户已锁定（占位实现）"}
+
+
+@router.post("/{user_id}/unlock", status_code=status.HTTP_200_OK)
+def unlock_user(
+    user_id: str,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user),
+    _ = Depends(require_permission("system:user:update")),
+):
+    """
+    解锁用户账户（占位实现）
+    
+    注意：此功能为占位实现，实际实现需要更新用户状态并记录解锁原因
+    """
+    from app.repositories.user_repository import UserRepository
+    
+    user_repo = UserRepository(db)
+    user = user_repo.get_by_id(user_id)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="用户不存在",
+        )
+    
+    # 占位：更新用户状态为启用
+    user.status = "active"
+    user_repo.update(user)
+    user_repo.commit()
+    
+    # TODO: 实际实现应该：
+    # 1. 记录解锁原因
+    # 2. 记录解锁时间
+    # 3. 发送通知
+    
+    return {"message": "用户已解锁（占位实现）"}
 
