@@ -11,6 +11,8 @@ import PermissionForm from './pages/PermissionForm'
 import RoleList from './pages/RoleList'
 import RoleForm from './pages/RoleForm'
 import Login from './pages/Login'
+import ConfigPage from './pages/ConfigPage'
+import AuditLogPage from './pages/AuditLogPage'
 import './App.css'
 
 const { Content } = Layout
@@ -48,6 +50,8 @@ function App() {
                     <Route path="/roles" element={<RoleList />} />
                     <Route path="/roles/new" element={<RoleForm />} />
                     <Route path="/roles/:id/edit" element={<RoleForm />} />
+                    <Route path="/configs" element={<ConfigPage />} />
+                    <Route path="/audit-logs" element={<AuditLogPage />} />
                   </Routes>
                 </Content>
               </AppLayout>

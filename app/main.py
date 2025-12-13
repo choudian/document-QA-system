@@ -5,6 +5,7 @@ from fastapi import FastAPI
 from app.api.v1 import router as api_router
 from app.core.config import settings
 from app.core.database import init_db
+from app.middleware.audit_middleware import AuditMiddleware
 import logging
 
 logging.basicConfig(level=logging.INFO)
@@ -15,6 +16,9 @@ app = FastAPI(
     description="个人知识库系统",
     version="1.0.0"
 )
+
+# 注册审计日志中间件（在其他中间件之后，路由之前）
+app.add_middleware(AuditMiddleware)
 
 app.include_router(api_router, prefix="/api/v1")
 

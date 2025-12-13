@@ -152,6 +152,38 @@ class TenantService:
         # 检查是否已存在租户管理员角色（系统级角色，tenant_id为None）
         existing_role = self.role_repo.get_by_name_in_tenant(None, "租户管理员")
         if existing_role:
+            # 已存在角色，检查并更新权限（确保包含配置管理权限）
+            import logging
+            logger = logging.getLogger(__name__)
+            
+            # 获取当前角色的权限代码集合
+            current_permission_codes = {perm.code for perm in existing_role.permissions} if existing_role.permissions else set()
+            
+            # 检查是否需要添加配置管理权限
+            config_permissions_needed = {
+                "system:config:menu",
+                "system:config:read",
+                "system:config:update",
+            }
+            
+            if not config_permissions_needed.issubset(current_permission_codes):
+                # 需要添加配置管理权限
+                permissions_to_add = []
+                for code in config_permissions_needed:
+                    if code not in current_permission_codes:
+                        permission = self.permission_repo.get_by_code(code)
+                        if permission:
+                            permissions_to_add.append(permission)
+                
+                if permissions_to_add:
+                    # 添加新权限（保留现有权限）
+                    if existing_role.permissions:
+                        existing_role.permissions.extend(permissions_to_add)
+                    else:
+                        existing_role.permissions = permissions_to_add
+                    # 不在这里commit，由主事务统一管理
+                    logger.info(f"为已存在的租户管理员角色添加了 {len(permissions_to_add)} 个配置管理权限")
+            
             return existing_role  # 已存在，返回现有角色
         
         # 创建租户管理员角色（系统级角色，tenant_id为None）
@@ -165,7 +197,7 @@ class TenantService:
         self.role_repo.flush()  # 获取角色ID
         
         # 获取所有租户级权限（tenant_id为None的系统级权限，以及该租户的权限）
-        # 租户管理员需要的权限：用户管理、角色管理、权限管理
+        # 租户管理员需要的权限：用户管理、角色管理、权限管理、配置管理
         tenant_admin_permission_codes = [
             "system:user:create",
             "system:user:read",
@@ -182,6 +214,12 @@ class TenantService:
             "system:permission:read",
             "system:permission:update",
             "system:permission:delete",
+            # 配置管理
+            "system:config:menu",
+            "system:config:read",
+            "system:config:update",
+            # 审计日志
+            "system:audit:read",
         ]
         
         # 查询这些权限

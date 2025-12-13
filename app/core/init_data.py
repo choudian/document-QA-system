@@ -6,9 +6,14 @@ from sqlalchemy.orm import Session
 from app.models.permission import Permission
 from app.models.role import Role
 from app.models.user import User
+from app.models.menu import Menu
+from app.models.config import SystemConfig
 from app.repositories.permission_repository import PermissionRepository
 from app.repositories.role_repository import RoleRepository
 from app.repositories.user_repository import UserRepository
+from app.repositories.config_repository import ConfigRepository
+from app.repositories.menu_repository import MenuRepository
+import base64
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +72,14 @@ def init_permissions(db: Session):
         {"code": "system:permission:read", "name": "查看权限", "description": "查看权限列表和详情", "type": "menu", "module": "system", "tenant_id": None},
         {"code": "system:permission:update", "name": "更新权限", "description": "更新权限信息", "type": "api", "module": "system", "tenant_id": None},
         {"code": "system:permission:delete", "name": "删除权限", "description": "删除权限", "type": "api", "module": "system", "tenant_id": None},
+
+        # 配置管理
+        {"code": "system:config:menu", "name": "配置管理菜单", "description": "查看配置菜单", "type": "menu", "module": "system", "tenant_id": None},
+        {"code": "system:config:read", "name": "查看配置", "description": "查看配置项", "type": "api", "module": "system", "tenant_id": None},
+        {"code": "system:config:update", "name": "更新配置", "description": "更新配置项", "type": "api", "module": "system", "tenant_id": None},
+        
+        # 审计日志
+        {"code": "system:audit:read", "name": "查看审计日志", "description": "查看审计日志", "type": "menu", "module": "system", "tenant_id": None},
     ]
     
     all_permissions = system_permissions + tenant_permissions
@@ -115,7 +128,7 @@ def init_roles(db: Session):
         role_repo.add(system_admin_role)
         role_repo.flush()  # 获取角色ID
         
-        # 系统管理员需要的权限：租户管理、用户管理、角色管理的菜单权限
+        # 系统管理员需要的权限：租户管理、用户管理、角色管理、配置管理的权限
         system_admin_permission_codes = [
             # 租户管理
             "system:tenant:create",
@@ -136,6 +149,12 @@ def init_roles(db: Session):
             "system:role:delete",
             "system:role:assign_permission",
             "system:role:assign_user",
+            # 配置管理
+            "system:config:menu",
+            "system:config:read",
+            "system:config:update",
+            # 审计日志
+            "system:audit:read",
         ]
         
         # 查询这些权限
@@ -178,6 +197,167 @@ def init_roles(db: Session):
             logger.info("所有系统管理员用户已分配角色")
 
 
+def init_system_configs(db: Session):
+    """初始化系统默认配置"""
+    from sqlalchemy import inspect
+    inspector = inspect(db.bind)
+    if "system_configs" not in inspector.get_table_names():
+        logger.info("系统配置表不存在，跳过初始化")
+        return
+
+    config_repo = ConfigRepository(db)
+
+    def _enc(val: str) -> str:
+        return "ENC:" + base64.b64encode(val.encode("utf-8")).decode("utf-8")
+
+    # 检查是否已有配置
+    existing = config_repo.list_system_configs(None)
+    if existing and len(existing) > 0:
+        logger.info("系统配置已存在，跳过初始化")
+        return
+
+    default_configs = [
+        # LLM（对象）
+        {
+            "category": "llm",
+            "key": "default",
+            "value": {
+                "provider": "openai",
+                "base_url": "https://api.openai.com/v1",
+                "api_key": _enc("dummy-api-key"),
+                "model": "gpt-4o-mini",
+                "timeout": 30,
+                "temperature": 0.7,
+            },
+        },
+        # Rerank
+        {
+            "category": "rerank",
+            "key": "default",
+            "value": {
+                "provider": "openai",
+                "base_url": "https://api.openai.com/v1",
+                "api_key": _enc("dummy-api-key"),
+                "model": "bge-rerank-base",
+            },
+        },
+        # Embedding
+        {
+            "category": "embedding",
+            "key": "default",
+            "value": {
+                "provider": "openai",
+                "base_url": "https://api.openai.com/v1",
+                "api_key": _enc("dummy-api-key"),
+                "model": "text-embedding-3-small",
+            },
+        },
+        # 向量库
+        {
+            "category": "vector_store",
+            "key": "default",
+            "value": {
+                "provider": "pgvector",
+                "base_url": "http://localhost:5432",
+                "api_key": _enc("dummy-api-key"),
+                "collection_prefix": "",
+            },
+        },
+        # 文档上传
+        {
+            "category": "doc",
+            "key": "upload",
+            "value": {"upload_types": ["txt", "md", "pdf", "word"], "max_file_size_mb": 50},
+        },
+        # 文本切分
+        {
+            "category": "doc",
+            "key": "chunk",
+            "value": {"strategy": "fixed", "size": 400, "overlap": 100},
+        },
+        # 检索
+        {"category": "retrieval", "key": "default", "value": {"top_k": 5, "similarity_threshold": 0.6}},
+    ]
+
+    try:
+        config_repo.upsert_system_configs(None, default_configs, operator_id=None)
+        config_repo.commit()
+        logger.info(f"初始化系统默认配置 {len(default_configs)} 条")
+    except Exception as e:
+        config_repo.rollback()
+        logger.error(f"初始化系统配置失败: {e}")
+        raise
+
+
+def init_menus(db: Session):
+    """初始化默认菜单"""
+    from sqlalchemy import inspect
+    inspector = inspect(db.bind)
+    if "menus" not in inspector.get_table_names():
+        logger.info("菜单表不存在，跳过菜单初始化")
+        return
+
+    menu_repo = MenuRepository(db)
+    permission_repo = PermissionRepository(db)
+
+    # 检查是否已有菜单数据（系统级）
+    try:
+        existing_count = menu_repo.count_by_tenant(None)
+        if existing_count > 0:
+            logger.info(f"菜单表已有 {existing_count} 条系统级菜单数据，跳过菜单初始化")
+            return
+    except Exception as e:
+        logger.warning(f"检查菜单表数据失败: {e}，尝试初始化")
+
+    logger.info("开始初始化默认菜单...")
+
+    default_menus = [
+        {"name": "租户管理", "path": "/tenants", "icon": "TeamOutlined", "permission_code": "system:tenant:read", "sort_order": 1},
+        {"name": "用户管理", "path": "/users", "icon": "UserOutlined", "permission_code": "system:user:read", "sort_order": 2},
+        {"name": "权限管理", "path": "/permissions", "icon": "SafetyOutlined", "permission_code": "system:permission:read", "sort_order": 3},
+        {"name": "角色管理", "path": "/roles", "icon": "UsergroupAddOutlined", "permission_code": "system:role:read", "sort_order": 4},
+        {"name": "配置管理", "path": "/configs", "icon": "SettingOutlined", "permission_code": "system:config:menu", "sort_order": 5},
+    ]
+
+    created_count = 0
+    for menu_data in default_menus:
+        # 权限存在性检查
+        if menu_data["permission_code"]:
+            permission = permission_repo.get_by_code(menu_data["permission_code"])
+            if not permission:
+                logger.warning(f"权限码 '{menu_data['permission_code']}' 不存在，跳过菜单 '{menu_data['name']}'")
+                continue
+
+        # 防重复
+        existing_menu = (
+            db.query(Menu)
+            .filter(
+                Menu.name == menu_data["name"],
+                Menu.tenant_id.is_(None)
+            )
+            .first()
+        )
+        if existing_menu:
+            logger.info(f"菜单 '{menu_data['name']}' 已存在，跳过")
+            continue
+
+        menu = Menu(
+            parent_id=None,
+            name=menu_data["name"],
+            path=menu_data["path"],
+            icon=menu_data["icon"],
+            permission_code=menu_data["permission_code"],
+            sort_order=menu_data["sort_order"],
+            visible=True,
+            tenant_id=None,
+            status=True,
+        )
+        menu_repo.add(menu)
+        created_count += 1
+
+    menu_repo.commit()
+    logger.info(f"成功初始化 {created_count} 个默认菜单")
+
 def init_default_data(db: Session):
     """初始化所有默认数据"""
     try:
@@ -186,6 +366,12 @@ def init_default_data(db: Session):
         
         # 2. 初始化角色（创建系统管理员角色）
         init_roles(db)
+        
+        # 3. 初始化系统默认配置
+        init_system_configs(db)
+
+        # 4. 初始化菜单（依赖权限）
+        init_menus(db)
         
         logger.info("默认数据初始化完成")
     except Exception as e:

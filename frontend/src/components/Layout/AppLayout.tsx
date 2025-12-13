@@ -1,11 +1,12 @@
 import { Layout, Menu, Button } from 'antd'
 import { useNavigate, useLocation } from 'react-router-dom'
 import {
-  HomeOutlined,
   TeamOutlined,
   UserOutlined,
   SafetyOutlined,
   UsergroupAddOutlined,
+  SettingOutlined,
+  FileTextOutlined,
 } from '@ant-design/icons'
 import { ReactNode, useState, useEffect } from 'react'
 import { meApi, Permission } from '@/api/me'
@@ -67,6 +68,18 @@ const AppLayout = ({ children }: AppLayoutProps) => {
       icon: <UsergroupAddOutlined />,
       label: '角色管理',
       permission: 'system:role:read',
+    },
+    {
+      key: '/configs',
+      icon: <SettingOutlined />,
+      label: '配置管理',
+      permission: 'system:config:menu',
+    },
+    {
+      key: '/audit-logs',
+      icon: <FileTextOutlined />,
+      label: '审计日志',
+      permission: 'system:audit:read',
     },
   ]
 
