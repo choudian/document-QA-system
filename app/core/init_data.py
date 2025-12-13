@@ -80,6 +80,10 @@ def init_permissions(db: Session):
         
         # 审计日志
         {"code": "system:audit:read", "name": "查看审计日志", "description": "查看审计日志", "type": "menu", "module": "system", "tenant_id": None},
+        
+        # 系统管理（额度/速率限制等）
+        {"code": "system:admin:read", "name": "查看系统管理信息", "description": "查看额度、速率限制等系统管理信息", "type": "api", "module": "system", "tenant_id": None},
+        {"code": "system:admin:update", "name": "更新系统管理配置", "description": "更新额度、速率限制等系统管理配置", "type": "api", "module": "system", "tenant_id": None},
     ]
     
     all_permissions = system_permissions + tenant_permissions

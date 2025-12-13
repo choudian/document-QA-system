@@ -6,6 +6,11 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.schemas.system_admin import SystemAdminInitRequest
+from app.schemas.quota import QuotaInfo, QuotaRequest, RateLimitInfo, RateLimitRequest
+from app.services.quota_service import QuotaService
+from app.api.v1.me import get_current_user
+from app.core.permissions import require_permission
+from typing import Optional, List
 from app.repositories.user_repository import UserRepository
 from app.repositories.role_repository import RoleRepository
 from app.core.security import password_hasher
@@ -72,4 +77,80 @@ def init_system_admin(payload: SystemAdminInitRequest, db: Session = Depends(get
     
     user_repo.commit()
     return {"message": "系统管理员创建成功"}
+
+
+@router.get("/quota", response_model=List[QuotaInfo], status_code=status.HTTP_200_OK)
+def get_quota(
+    tenant_id: Optional[str] = None,
+    user_id: Optional[str] = None,
+    quota_type: Optional[str] = None,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+    _=Depends(require_permission("system:admin:read")),
+):
+    """
+    获取额度信息（占位实现）
+    
+    注意：此功能为占位实现，实际实现需要从数据库或配置中读取
+    """
+    quota_service = QuotaService()
+    return quota_service.get_quota(
+        tenant_id=tenant_id,
+        user_id=user_id,
+        quota_type=quota_type,
+    )
+
+
+@router.post("/quota", status_code=status.HTTP_200_OK)
+def set_quota(
+    payload: QuotaRequest,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+    _=Depends(require_permission("system:admin:update")),
+):
+    """
+    设置额度（占位实现）
+    
+    注意：此功能为占位实现，实际实现需要保存到数据库或配置
+    """
+    quota_service = QuotaService()
+    return quota_service.set_quota(payload)
+
+
+@router.get("/rate-limit", response_model=List[RateLimitInfo], status_code=status.HTTP_200_OK)
+def get_rate_limit(
+    tenant_id: Optional[str] = None,
+    user_id: Optional[str] = None,
+    limit_type: Optional[str] = None,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+    _=Depends(require_permission("system:admin:read")),
+):
+    """
+    获取速率限制信息（占位实现）
+    
+    注意：此功能为占位实现，实际实现需要从数据库或配置中读取
+    """
+    quota_service = QuotaService()
+    return quota_service.get_rate_limit(
+        tenant_id=tenant_id,
+        user_id=user_id,
+        limit_type=limit_type,
+    )
+
+
+@router.post("/rate-limit", status_code=status.HTTP_200_OK)
+def set_rate_limit(
+    payload: RateLimitRequest,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+    _=Depends(require_permission("system:admin:update")),
+):
+    """
+    设置速率限制（占位实现）
+    
+    注意：此功能为占位实现，实际实现需要保存到数据库或配置
+    """
+    quota_service = QuotaService()
+    return quota_service.set_rate_limit(payload)
 

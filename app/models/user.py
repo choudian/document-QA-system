@@ -20,6 +20,8 @@ class User(Base):
     status = Column(String(20), default="active", nullable=False, comment="状态：active-启用，frozen-冻结")
     is_tenant_admin = Column(Boolean, default=False, nullable=False, comment="是否为租户管理员")
     is_system_admin = Column(Boolean, default=False, nullable=False, comment="是否为系统管理员")
+    mfa_enabled = Column(Boolean, default=False, nullable=False, comment="是否启用 MFA")
+    mfa_secret = Column(String(255), nullable=True, comment="MFA 密钥（OTP secret）")
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False, comment="创建时间")
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False, comment="更新时间")
     created_by = Column(String, nullable=True, comment="创建人ID")

@@ -10,6 +10,7 @@ python-multipart==0.0.6
 alembic==1.12.1
 email-validator==2.1.0.post1
 langfuse>=2.0.0
+pyotp>=2.9.0
 
 # 数据库驱动（根据需要选择安装）
 # PostgreSQL

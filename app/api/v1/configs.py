@@ -13,6 +13,7 @@ from app.schemas.config import (
     ConfigHistoryResponse,
     ConfigDefinitionsResponse,
 )
+from pydantic import BaseModel, Field
 from app.repositories.config_repository import ConfigRepository
 from app.services.config_service import ConfigService
 from app.core.permissions import require_permission
