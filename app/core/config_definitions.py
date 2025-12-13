@@ -25,6 +25,7 @@ CONFIG_SCOPE_LEVELS: Dict[str, Dict[str, List[str]]] = {
     "llm": {"default": ["system", "tenant", "user"]},  # 3层
     "rerank": {"default": ["system", "tenant", "user"]},  # 3层
     "retrieval": {"default": ["system", "tenant", "user"]},  # 3层
+    "langfuse": {"default": ["system"]},  # 仅系统级
 }
 
 CONFIG_DEFINITIONS: Dict[str, Dict[str, Dict[str, Any]]] = {
@@ -79,6 +80,14 @@ CONFIG_DEFINITIONS: Dict[str, Dict[str, Dict[str, Any]]] = {
             "similarity_threshold": {"type": (int, float), "required": True, "min": 0, "max": 1},
         }
     },
+    "langfuse": {
+        "default": {
+            "enabled": {"type": bool, "required": True},
+            "public_key": {"type": str, "required": False, "sensitive": True},
+            "secret_key": {"type": str, "required": False, "sensitive": True},
+            "host": {"type": str, "required": False},
+        }
+    },
 }
 
 # 配置项显示标签映射
@@ -89,6 +98,7 @@ CONFIG_LABELS: Dict[str, Dict[str, str]] = {
     "vector_store": {"default": "向量库"},
     "doc": {"upload": "文档上传", "chunk": "文本切分"},
     "retrieval": {"default": "检索参数"},
+    "langfuse": {"default": "Langfuse"},
 }
 
 # 字段显示标签映射
@@ -107,6 +117,10 @@ FIELD_LABELS: Dict[str, str] = {
     "overlap": "chunk overlap",
     "top_k": "topK",
     "similarity_threshold": "相似度阈值",
+    "enabled": "启用",
+    "public_key": "Public Key",
+    "secret_key": "Secret Key",
+    "host": "服务器地址",
 }
 
 # 字段占位符映射
@@ -125,6 +139,10 @@ FIELD_PLACEHOLDERS: Dict[str, str] = {
     "overlap": "",
     "top_k": "",
     "similarity_threshold": "",
+    "enabled": "",
+    "public_key": "请输入 Langfuse Public Key",
+    "secret_key": "请输入 Langfuse Secret Key",
+    "host": "https://cloud.langfuse.com",
 }
 
 

@@ -277,6 +277,17 @@ def init_system_configs(db: Session):
         },
         # 检索
         {"category": "retrieval", "key": "default", "value": {"top_k": 5, "similarity_threshold": 0.6}},
+        # Langfuse
+        {
+            "category": "langfuse",
+            "key": "default",
+            "value": {
+                "enabled": False,
+                "public_key": "",
+                "secret_key": "",
+                "host": "https://cloud.langfuse.com",
+            },
+        },
     ]
 
     try:

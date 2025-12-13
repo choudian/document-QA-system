@@ -17,6 +17,7 @@ dependencies = [
     "python-multipart==0.0.6",
     "alembic==1.12.1",
     "psycopg2-binary==2.9.9",
+    "langfuse>=2.0.0",
 ]
 
 [project.optional-dependencies]
