@@ -34,6 +34,13 @@ class DocumentChunkRepository:
             DocumentChunk.document_id == document_id
         ).order_by(DocumentChunk.chunk_index).all()
     
+    def get_by_document_and_index(self, document_id: str, chunk_index: int) -> Optional[DocumentChunk]:
+        """根据文档ID和chunk索引获取chunk"""
+        return self.db.query(DocumentChunk).filter(
+            DocumentChunk.document_id == document_id,
+            DocumentChunk.chunk_index == chunk_index
+        ).first()
+    
     def list_by_document(
         self,
         document_id: str,

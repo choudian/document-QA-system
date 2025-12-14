@@ -96,6 +96,16 @@ def init_permissions(db: Session):
         {"code": "doc:folder:read", "name": "查看文件夹", "description": "查看文件夹列表和详情", "type": "api", "module": "doc", "tenant_id": None},
         {"code": "doc:folder:update", "name": "更新文件夹", "description": "更新文件夹信息（如重命名）", "type": "api", "module": "doc", "tenant_id": None},
         {"code": "doc:folder:delete", "name": "删除文件夹", "description": "删除文件夹", "type": "api", "module": "doc", "tenant_id": None},
+        
+        # 问答模块
+        {"code": "qa:conversation:menu", "name": "问答菜单", "description": "问答菜单权限", "type": "menu", "module": "qa", "tenant_id": None},
+        {"code": "qa:conversation:create", "name": "创建会话", "description": "创建新会话", "type": "button", "module": "qa", "tenant_id": None},
+        {"code": "qa:conversation:read", "name": "查看会话", "description": "查看会话列表和详情", "type": "api", "module": "qa", "tenant_id": None},
+        {"code": "qa:conversation:update", "name": "更新会话", "description": "更新会话信息", "type": "api", "module": "qa", "tenant_id": None},
+        {"code": "qa:conversation:delete", "name": "删除会话", "description": "删除会话", "type": "api", "module": "qa", "tenant_id": None},
+        {"code": "qa:conversation:chat", "name": "进行对话", "description": "进行问答对话", "type": "api", "module": "qa", "tenant_id": None},
+        {"code": "qa:message:read", "name": "查看消息", "description": "查看消息列表和详情", "type": "api", "module": "qa", "tenant_id": None},
+        {"code": "qa:message:delete", "name": "删除消息", "description": "删除消息", "type": "api", "module": "qa", "tenant_id": None},
     ]
     
     all_permissions = system_permissions + tenant_permissions
@@ -348,6 +358,15 @@ def init_roles(db: Session):
             "doc:folder:read",
             "doc:folder:update",
             "doc:folder:delete",
+            # 问答模块
+            "qa:conversation:menu",
+            "qa:conversation:create",
+            "qa:conversation:read",
+            "qa:conversation:update",
+            "qa:conversation:delete",
+            "qa:conversation:chat",
+            "qa:message:read",
+            "qa:message:delete",
         ]
         
         # 查询这些权限
