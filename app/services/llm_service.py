@@ -1,11 +1,12 @@
 """
-LLM服务
+LLM服务 - 基于LangChain实现
 """
 import logging
 import json
 import base64
 from typing import Dict, Any, List, Optional, AsyncGenerator
-import httpx
+from langchain_openai import ChatOpenAI
+from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, SystemMessage
 from app.services.config_service import ConfigService
 from app.repositories.config_repository import ConfigRepository
 
@@ -13,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 class LLMService:
-    """LLM服务"""
+    """LLM服务 - 基于LangChain"""
     
     def __init__(self, config_service: ConfigService, config_repo: Optional[ConfigRepository] = None):
         self.config_service = config_service
@@ -82,6 +83,54 @@ class LLMService:
                 return text
         return text
     
+    def _convert_messages(self, messages: List[Dict[str, str]]) -> List[BaseMessage]:
+        """将消息列表转换为LangChain消息格式"""
+        langchain_messages = []
+        for msg in messages:
+            role = msg.get("role", "user")
+            content = msg.get("content", "")
+            
+            if role == "system":
+                langchain_messages.append(SystemMessage(content=content))
+            elif role == "user":
+                langchain_messages.append(HumanMessage(content=content))
+            elif role == "assistant":
+                langchain_messages.append(AIMessage(content=content))
+            else:
+                # 未知角色，默认为用户消息
+                langchain_messages.append(HumanMessage(content=content))
+        
+        return langchain_messages
+    
+    def _create_chat_model(self, config: Dict[str, Any], temperature: Optional[float] = None, 
+                          max_tokens: Optional[int] = None, streaming: bool = False) -> ChatOpenAI:
+        """创建ChatOpenAI实例"""
+        base_url = config.get("base_url", "https://api.openai.com/v1")
+        api_key = config.get("api_key", "")
+        model = config.get("model", "gpt-4o-mini")
+        config_temperature = config.get("temperature", 0.7)
+        timeout = config.get("timeout", 60)
+        
+        # 解密API key
+        if api_key.startswith("ENC:"):
+            api_key = self._decrypt(api_key)
+        
+        # 构建ChatOpenAI参数
+        # LangChain ChatOpenAI支持自定义base_url和api_key
+        chat_params = {
+            "model": model,
+            "api_key": api_key,
+            "base_url": base_url,  # 支持自定义API端点（如阿里云等OpenAI兼容API）
+            "temperature": temperature if temperature is not None else config_temperature,
+            "timeout": timeout,
+            "streaming": streaming,
+        }
+        
+        if max_tokens:
+            chat_params["max_tokens"] = max_tokens
+        
+        return ChatOpenAI(**chat_params)
+    
     async def chat_completion(
         self,
         messages: List[Dict[str, str]],
@@ -100,15 +149,44 @@ class LLMService:
             user_id: 用户ID
             temperature: 温度参数
             max_tokens: 最大token数
-            stream: 是否流式输出（这里用于非流式调用）
+            stream: 是否流式输出（这里用于非流式调用，忽略）
         
         Returns:
             包含回复和token统计的字典
         """
         config = self.get_llm_config(tenant_id, user_id)
-        return await self._chat_completion_with_config(
-            messages, config, temperature, max_tokens, stream=False
-        )
+        
+        # 转换为LangChain消息格式
+        langchain_messages = self._convert_messages(messages)
+        
+        # 创建ChatOpenAI实例
+        chat_model = self._create_chat_model(config, temperature, max_tokens, streaming=False)
+        
+        try:
+            # 调用LangChain
+            response = await chat_model.ainvoke(langchain_messages)
+            
+            # 获取usage信息（如果有）
+            usage_info = {}
+            if hasattr(response, "response_metadata"):
+                metadata = response.response_metadata
+                if "token_usage" in metadata:
+                    token_usage = metadata["token_usage"]
+                    usage_info = {
+                        "prompt_tokens": token_usage.get("prompt_tokens", 0),
+                        "completion_tokens": token_usage.get("completion_tokens", 0),
+                        "total_tokens": token_usage.get("total_tokens", 0),
+                    }
+            
+            return {
+                "content": response.content if hasattr(response, "content") else str(response),
+                "role": "assistant",
+                "finish_reason": "stop",
+                "usage": usage_info
+            }
+        except Exception as e:
+            logger.error(f"LLM调用失败: {e}", exc_info=True)
+            raise
     
     async def chat_completion_stream(
         self,
@@ -132,174 +210,39 @@ class LLMService:
             SSE格式的字符串片段
         """
         config = self.get_llm_config(tenant_id, user_id)
-        async for chunk in self._chat_completion_stream_with_config(
-            messages, config, temperature, max_tokens
-        ):
-            yield chunk
-    
-    async def _chat_completion_with_config(
-        self,
-        messages: List[Dict[str, str]],
-        config: Dict[str, Any],
-        temperature: Optional[float] = None,
-        max_tokens: Optional[int] = None,
-        stream: bool = False
-    ) -> Dict[str, Any]:
-        """使用指定配置调用LLM"""
-        provider = config.get("provider", "openai")
         
-        if provider == "openai" or provider == "aliyun":
-            return await self._chat_completion_openai(
-                messages, config, temperature, max_tokens, stream
-            )
-        else:
-            raise ValueError(f"不支持的LLM provider: {provider}")
-    
-    async def _chat_completion_openai(
-        self,
-        messages: List[Dict[str, str]],
-        config: Dict[str, Any],
-        temperature: Optional[float] = None,
-        max_tokens: Optional[int] = None,
-        stream: bool = False
-    ) -> Dict[str, Any]:
-        """使用OpenAI兼容API进行对话"""
-        base_url = config.get("base_url", "https://api.openai.com/v1")
-        api_key = config.get("api_key", "")
-        model = config.get("model", "gpt-4o-mini")
-        config_temperature = config.get("temperature", 0.7)
-        timeout = config.get("timeout", 60)
+        # 转换为LangChain消息格式
+        langchain_messages = self._convert_messages(messages)
         
-        # 解密API key
-        if api_key.startswith("ENC:"):
-            api_key = self._decrypt(api_key)
+        # 创建ChatOpenAI实例（流式）
+        chat_model = self._create_chat_model(config, temperature, max_tokens, streaming=True)
         
-        url = f"{base_url}/chat/completions"
-        headers = {
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json"
-        }
-        
-        # 构建请求参数
-        data = {
-            "model": model,
-            "messages": messages,
-            "temperature": temperature if temperature is not None else config_temperature,
-            "stream": stream
-        }
-        if max_tokens:
-            data["max_tokens"] = max_tokens
-        
-        async with httpx.AsyncClient(timeout=timeout) as client:
-            try:
-                response = await client.post(url, headers=headers, json=data)
-                response.raise_for_status()
-                result = response.json()
-                
-                # 解析响应
-                choice = result["choices"][0]
-                message = choice["message"]
-                
-                return {
-                    "content": message.get("content", ""),
-                    "role": message.get("role", "assistant"),
-                    "finish_reason": choice.get("finish_reason"),
-                    "usage": result.get("usage", {})
-                }
-            except httpx.HTTPStatusError as e:
-                error_detail = ""
-                if e.response is not None:
-                    try:
-                        error_detail = e.response.json()
-                    except:
-                        error_detail = e.response.text[:500]
-                logger.error(f"LLM API调用失败: {e.response.status_code if e.response else 'N/A'}, URL: {url}, Model: {model}, 错误详情: {error_detail}")
-                raise
-    
-    async def _chat_completion_stream_with_config(
-        self,
-        messages: List[Dict[str, str]],
-        config: Dict[str, Any],
-        temperature: Optional[float] = None,
-        max_tokens: Optional[int] = None
-    ) -> AsyncGenerator[str, None]:
-        """使用指定配置进行流式对话"""
-        provider = config.get("provider", "openai")
-        
-        if provider == "openai" or provider == "aliyun":
-            async for chunk in self._chat_completion_stream_openai(
-                messages, config, temperature, max_tokens
-            ):
-                yield chunk
-        else:
-            raise ValueError(f"不支持的LLM provider: {provider}")
-    
-    async def _chat_completion_stream_openai(
-        self,
-        messages: List[Dict[str, str]],
-        config: Dict[str, Any],
-        temperature: Optional[float] = None,
-        max_tokens: Optional[int] = None
-    ) -> AsyncGenerator[str, None]:
-        """使用OpenAI兼容API进行流式对话"""
-        base_url = config.get("base_url", "https://api.openai.com/v1")
-        api_key = config.get("api_key", "")
-        model = config.get("model", "gpt-4o-mini")
-        config_temperature = config.get("temperature", 0.7)
-        timeout = config.get("timeout", 60)
-        
-        # 解密API key
-        if api_key.startswith("ENC:"):
-            api_key = self._decrypt(api_key)
-        
-        url = f"{base_url}/chat/completions"
-        headers = {
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json"
-        }
-        
-        # 构建请求参数
-        data = {
-            "model": model,
-            "messages": messages,
-            "temperature": temperature if temperature is not None else config_temperature,
-            "stream": True
-        }
-        if max_tokens:
-            data["max_tokens"] = max_tokens
-        
-        async with httpx.AsyncClient(timeout=timeout) as client:
-            try:
-                async with client.stream("POST", url, headers=headers, json=data) as response:
-                    response.raise_for_status()
-                    
-                    async for line in response.aiter_lines():
-                        if not line.strip():
-                            continue
-                        
-                        # OpenAI流式响应格式：data: {...} 或 data: [DONE]
-                        if line.startswith("data: "):
-                            data_str = line[6:]  # 去掉 "data: " 前缀
-                            
-                            if data_str == "[DONE]":
-                                yield f"data: [DONE]\n\n"
-                                break
-                            
-                            try:
-                                data_json = json.loads(data_str)
-                                # 发送SSE格式的数据
-                                yield f"data: {json.dumps(data_json, ensure_ascii=False)}\n\n"
-                            except json.JSONDecodeError:
-                                logger.warning(f"无法解析流式响应数据: {data_str}")
-                                continue
-            except httpx.HTTPStatusError as e:
-                error_detail = ""
-                if e.response is not None:
-                    try:
-                        error_detail = e.response.json()
-                    except:
-                        error_detail = e.response.text[:500]
-                logger.error(f"LLM流式API调用失败: {e.response.status_code if e.response else 'N/A'}, URL: {url}, Model: {model}, 错误详情: {error_detail}")
-                # 发送错误信息
-                yield f"data: {json.dumps({'error': error_detail}, ensure_ascii=False)}\n\n"
-                raise
+        try:
+            # 使用astream进行流式调用
+            async for chunk in chat_model.astream(langchain_messages):
+                # chunk是AIMessageChunk类型
+                if hasattr(chunk, "content") and chunk.content:
+                    # 构建SSE格式的数据
+                    chunk_data = {
+                        "id": f"chatcmpl-{id(chunk)}",
+                        "object": "chat.completion.chunk",
+                        "created": 0,
+                        "model": config.get("model", "gpt-4o-mini"),
+                        "choices": [{
+                            "index": 0,
+                            "delta": {"content": chunk.content},
+                            "finish_reason": None
+                        }]
+                    }
+                    chunk_json = json.dumps(chunk_data, ensure_ascii=False)
+                    yield f"data: {chunk_json}\n\n"
+            
+            # 流式完成
+            yield "data: [DONE]\n\n"
+        except Exception as e:
+            logger.error(f"LLM流式调用失败: {e}", exc_info=True)
+            # 发送错误信息
+            error_data = {"error": str(e)}
+            error_json = json.dumps(error_data, ensure_ascii=False)
+            yield f"data: {error_json}\n\n"
+            raise
