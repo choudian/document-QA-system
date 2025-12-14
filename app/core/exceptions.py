@@ -80,3 +80,43 @@ class FileValidationException(DomainException):
             status_code=status.HTTP_400_BAD_REQUEST
         )
 
+
+class ConversationNotFoundException(DomainException):
+    """会话不存在异常"""
+    
+    def __init__(self, conversation_id: str):
+        super().__init__(
+            detail=f"会话不存在: {conversation_id}",
+            status_code=status.HTTP_404_NOT_FOUND
+        )
+
+
+class ConversationPermissionDeniedException(DomainException):
+    """会话权限不足异常"""
+    
+    def __init__(self, conversation_id: str):
+        super().__init__(
+            detail=f"无权访问该会话: {conversation_id}",
+            status_code=status.HTTP_403_FORBIDDEN
+        )
+
+
+class MessageNotFoundException(DomainException):
+    """消息不存在异常"""
+    
+    def __init__(self, message_id: str):
+        super().__init__(
+            detail=f"消息不存在: {message_id}",
+            status_code=status.HTTP_404_NOT_FOUND
+        )
+
+
+class MessagePermissionDeniedException(DomainException):
+    """消息权限不足异常"""
+    
+    def __init__(self, message_id: str):
+        super().__init__(
+            detail=f"无权访问该消息: {message_id}",
+            status_code=status.HTTP_403_FORBIDDEN
+        )
+

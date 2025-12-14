@@ -15,10 +15,13 @@ from app.models.document_config import DocumentConfig
 from app.models.user_recent_config import UserRecentConfig
 from app.models.document_chunk import DocumentChunk
 from app.models.document_task import DocumentTask
+from app.models.conversation import Conversation
+from app.models.message import Message
 
 __all__ = [
     "Tenant", "User", "Permission", "Role", "SystemConfig", "UserConfig", "ConfigHistory",
     "Folder", "Document", "DocumentVersion", "DocumentTag", "DocumentTagAssociation",
-    "DocumentConfig", "UserRecentConfig", "DocumentChunk", "DocumentTask"
+    "DocumentConfig", "UserRecentConfig", "DocumentChunk", "DocumentTask",
+    "Conversation", "Message"
 ]
 
