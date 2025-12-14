@@ -118,11 +118,14 @@ class DocumentService:
         # 生成文件哈希
         file_hash = self.storage_service.generate_file_hash(file_content)
         
-        # 检查是否已存在相同文件
-        existing_doc = self.document_repo.get_by_hash(file_hash, tenant_id)
-        if existing_doc and existing_doc.user_id == user_id:
+        # 检查是否存在同名文件（用于版本管理）
+        existing_doc_by_name = self.document_repo.check_duplicate(filename, folder_id, tenant_id, user_id)
+        
+        # 检查是否已存在相同文件（用于存储路径复用）
+        existing_doc_by_hash = self.document_repo.get_by_hash(file_hash, tenant_id)
+        if existing_doc_by_hash and existing_doc_by_hash.user_id == user_id:
             # 可以复用存储路径
-            storage_path = existing_doc.storage_path
+            storage_path = existing_doc_by_hash.storage_path
         else:
             # 保存文件（异步方式）
             storage_path = await self.storage_service.save_file(
@@ -142,22 +145,69 @@ class DocumentService:
         }
         mime_type = mime_map.get(file_type, "application/octet-stream")
         
-        # 创建文档记录
-        document = Document(
-            tenant_id=tenant_id,
-            user_id=user_id,
-            folder_id=folder_id,
-            name=filename,
-            original_name=filename,
-            file_type=file_type,
-            mime_type=mime_type,
-            file_size=len(file_content),
-            file_hash=file_hash,
-            storage_path=storage_path,
-            status="uploaded"
-        )
-        
-        document = self.document_repo.create(document)
+        # 如果存在同名文件，创建新版本并保存旧版本到版本历史
+        old_document_id = None
+        if existing_doc_by_name:
+            # 保存旧版本到版本历史表
+            from app.models.document_version import DocumentVersion
+            old_version = DocumentVersion(
+                document_id=existing_doc_by_name.id,
+                version=existing_doc_by_name.version,
+                file_hash=existing_doc_by_name.file_hash,
+                storage_path=existing_doc_by_name.storage_path,
+                markdown_path=existing_doc_by_name.markdown_path,
+                operator_id=user_id,
+                is_current=False  # 旧版本不再是当前版本
+            )
+            self.document_version_repo.create(old_version)
+            
+            # 获取下一个版本号（基于旧文档的版本历史）
+            next_version = self.document_version_repo.get_next_version_number(existing_doc_by_name.id)
+            old_document_id = existing_doc_by_name.id
+            
+            # 创建新版本文档（使用新的ID，但记录旧版本ID用于后续清理）
+            document = Document(
+                tenant_id=tenant_id,
+                user_id=user_id,
+                folder_id=folder_id,
+                name=filename,
+                original_name=filename,
+                file_type=file_type,
+                mime_type=mime_type,
+                file_size=len(file_content),
+                file_hash=file_hash,
+                storage_path=storage_path,
+                version=next_version,
+                status="uploaded"
+            )
+            document = self.document_repo.create(document)
+            
+            # 创建新版本的版本历史记录（标记为当前版本）
+            new_version = DocumentVersion(
+                document_id=document.id,
+                version=document.version,
+                file_hash=document.file_hash,
+                storage_path=document.storage_path,
+                operator_id=user_id,
+                is_current=True
+            )
+            self.document_version_repo.create(new_version)
+        else:
+            # 创建新文档（无同名文件，首次上传）
+            document = Document(
+                tenant_id=tenant_id,
+                user_id=user_id,
+                folder_id=folder_id,
+                name=filename,
+                original_name=filename,
+                file_type=file_type,
+                mime_type=mime_type,
+                file_size=len(file_content),
+                file_hash=file_hash,
+                storage_path=storage_path,
+                status="uploaded"
+            )
+            document = self.document_repo.create(document)
         
         # 保存文档配置
         chunk_config = self._get_chunk_config(tenant_id)
@@ -192,18 +242,27 @@ class DocumentService:
             )
         
         # 异步解析文档（使用后台任务）
+        # 传递旧文档ID，用于新版本向量化成功后清理旧版本向量数据
         if background_tasks:
             background_tasks.add_task(
                 self._parse_document_async,
                 document.id,
                 storage_path,
-                file_type
+                file_type,
+                old_document_id  # 传递旧文档ID
             )
         
         return document
     
-    async def _parse_document_async(self, document_id: str, storage_path: str, file_type: str):
-        """异步解析文档"""
+    async def _parse_document_async(self, document_id: str, storage_path: str, file_type: str, old_document_id: Optional[str] = None):
+        """异步解析文档
+        
+        Args:
+            document_id: 新文档ID
+            storage_path: 存储路径
+            file_type: 文件类型
+            old_document_id: 旧文档ID（如果存在，用于新版本向量化成功后清理旧版本向量数据）
+        """
         try:
             document = self.document_repo.get_by_id(document_id)
             if not document:
@@ -246,7 +305,10 @@ class DocumentService:
                 
                 # 向量化文档
                 try:
-                    await self._vectorize_document(document, storage)
+                    success = await self._vectorize_document(document, storage)
+                    # 如果向量化成功且存在旧版本，清理旧版本的向量数据
+                    if success and old_document_id:
+                        await self._cleanup_old_version_vectors(old_document_id, document.tenant_id, document.user_id, document.folder_id)
                 except Exception as e:
                     logger.error(f"文档 {document_id} 向量化失败: {e}", exc_info=True)
                     # 向量化失败不影响文档解析成功状态
@@ -269,7 +331,7 @@ class DocumentService:
         config = self.document_config_repo.get_by_document_id(document.id)
         if not config:
             logger.warning(f"文档 {document.id} 没有配置，跳过向量化")
-            return
+            return False
         
         # 创建向量化服务所需的依赖
         from app.services.text_splitter_service import TextSplitterService
@@ -307,8 +369,68 @@ class DocumentService:
         
         if success:
             logger.info(f"文档 {document.id} 向量化成功")
+            # 标记文档为已完成
+            document.mark_as_completed()
+            self.document_repo.update(document)
         else:
             logger.warning(f"文档 {document.id} 向量化失败")
+            document.mark_as_vectorize_failed()
+            self.document_repo.update(document)
+        return success
+    
+    async def _cleanup_old_version_vectors(
+        self,
+        old_document_id: str,
+        tenant_id: str,
+        user_id: str,
+        folder_id: Optional[str]
+    ):
+        """清理旧版本的向量数据
+        
+        Args:
+            old_document_id: 旧文档ID
+            tenant_id: 租户ID
+            user_id: 用户ID
+            folder_id: 文件夹ID
+        """
+        try:
+            logger.info(f"开始清理旧版本文档 {old_document_id} 的向量数据")
+            
+            # 获取旧文档信息
+            old_document = self.document_repo.get_by_id(old_document_id, tenant_id)
+            if not old_document:
+                logger.warning(f"旧文档 {old_document_id} 不存在，跳过清理")
+                return
+            
+            # 删除向量库索引
+            try:
+                from app.core.vector_store.vector_store_factory import VectorStoreFactory
+                
+                vector_store = VectorStoreFactory.create_from_config(
+                    tenant_id,
+                    self.config_service
+                )
+                vector_store.delete_by_document_id(
+                    document_id=old_document_id,
+                    tenant_id=tenant_id,
+                    user_id=user_id,
+                    folder_id=folder_id
+                )
+                logger.info(f"已删除旧文档 {old_document_id} 的向量库索引")
+            except Exception as e:
+                logger.error(f"删除旧文档 {old_document_id} 的向量库索引失败: {e}", exc_info=True)
+            
+            # 删除文档chunk数据
+            try:
+                chunk_repo = DocumentChunkRepository(self.document_repo.db)
+                deleted_count = chunk_repo.delete_by_document_id(old_document_id)
+                logger.info(f"已删除旧文档 {old_document_id} 的 {deleted_count} 个chunk")
+            except Exception as e:
+                logger.error(f"删除旧文档 {old_document_id} 的chunk失败: {e}", exc_info=True)
+            
+            logger.info(f"完成清理旧版本文档 {old_document_id} 的向量数据")
+        except Exception as e:
+            logger.error(f"清理旧版本文档 {old_document_id} 的向量数据失败: {e}", exc_info=True)
     
     def list_documents(
         self,
