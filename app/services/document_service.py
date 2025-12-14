@@ -253,7 +253,7 @@ class DocumentService:
             else:
                 # 解析失败
                 document.mark_as_parse_failed()
-                # TODO: 加入待办表
+                # 注意：待办表功能为预留接口，暂不实现自动加入待办表的逻辑
                 self.document_repo.update(document)
             
         except Exception as e:

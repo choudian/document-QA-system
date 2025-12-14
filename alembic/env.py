@@ -36,6 +36,7 @@ from app.models.document_tag_association import DocumentTagAssociation
 from app.models.document_config import DocumentConfig
 from app.models.user_recent_config import UserRecentConfig
 from app.models.document_chunk import DocumentChunk
+from app.models.document_task import DocumentTask
 
 target_metadata = Base.metadata
 

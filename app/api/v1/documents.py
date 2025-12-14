@@ -13,6 +13,7 @@ from app.schemas.document import (
     DocumentVersionResponse, TagResponse, DocumentTagRequest, DocumentTagListResponse,
     DocumentConfigRequest, DocumentConfigResponse
 )
+from app.schemas.document_task import DocumentTaskResponse, DocumentTaskListResponse
 from app.repositories.folder_repository import FolderRepository
 from app.repositories.document_repository import DocumentRepository
 from app.repositories.document_version_repository import DocumentVersionRepository
@@ -534,4 +535,105 @@ def get_recent_config(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="没有最近使用的配置")
     
     return DocumentConfigResponse.from_orm(recent_config)
+
+
+# 待办表接口（占位实现）
+@router.get("/tasks", response_model=DocumentTaskListResponse)
+def list_document_tasks(
+    task_type: Optional[str] = None,
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    _=Depends(require_permission("doc:file:read"))
+):
+    """
+    查询文档任务列表（待办表）
+    
+    注意：此功能暂未实现，仅作为占位接口
+    """
+    from app.repositories.document_task_repository import DocumentTaskRepository
+    from app.services.document_task_service import DocumentTaskService
+    
+    task_repo = DocumentTaskRepository(db)
+    task_service = DocumentTaskService(task_repo)
+    
+    tasks = task_service.list_tasks(
+        user_id=current_user.id,
+        tenant_id=current_user.tenant_id or "",
+        task_type=task_type,
+        skip=skip,
+        limit=limit
+    )
+    
+    return DocumentTaskListResponse(
+        tasks=[DocumentTaskResponse.from_orm(task) for task in tasks],
+        total=len(tasks)
+    )
+
+
+@router.get("/tasks/{task_id}", response_model=DocumentTaskResponse)
+def get_document_task(
+    task_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    _=Depends(require_permission("doc:file:read"))
+):
+    """
+    获取文档任务详情
+    
+    注意：此功能暂未实现，仅作为占位接口
+    """
+    from app.repositories.document_task_repository import DocumentTaskRepository
+    from app.services.document_task_service import DocumentTaskService
+    
+    task_repo = DocumentTaskRepository(db)
+    task_service = DocumentTaskService(task_repo)
+    
+    task = task_service.get_task(
+        task_id=task_id,
+        user_id=current_user.id,
+        tenant_id=current_user.tenant_id or ""
+    )
+    
+    if not task:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="任务不存在"
+        )
+    
+    return DocumentTaskResponse.from_orm(task)
+
+
+@router.delete("/tasks/{task_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_document_task(
+    task_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    _=Depends(require_permission("doc:file:delete"))
+):
+    """
+    删除文档任务
+    
+    注意：此功能暂未实现，仅作为占位接口
+    """
+    from app.repositories.document_task_repository import DocumentTaskRepository
+    from app.services.document_task_service import DocumentTaskService
+    
+    task_repo = DocumentTaskRepository(db)
+    task_service = DocumentTaskService(task_repo)
+    
+    success = task_service.delete_task(
+        task_id=task_id,
+        user_id=current_user.id,
+        tenant_id=current_user.tenant_id or ""
+    )
+    
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="任务不存在或无权删除"
+        )
+    
+    return None
 
