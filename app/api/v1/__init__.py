@@ -2,7 +2,7 @@
 API v1路由
 """
 from fastapi import APIRouter
-from app.api.v1 import tenants, users, auth, system_admin, permissions, roles, me, menus, configs, audit_logs
+from app.api.v1 import tenants, users, auth, system_admin, permissions, roles, me, menus, configs, audit_logs, documents
 
 router = APIRouter()
 
@@ -15,5 +15,6 @@ router.include_router(roles.router, prefix="/roles", tags=["角色管理"])
 router.include_router(menus.router, prefix="/menus", tags=["菜单管理"])
 router.include_router(configs.router, prefix="/configs", tags=["配置管理"])
 router.include_router(audit_logs.router, prefix="/audit-logs", tags=["审计日志"])
+router.include_router(documents.router, prefix="/documents", tags=["文档管理"])
 router.include_router(me.router, prefix="/me", tags=["当前用户"])
 

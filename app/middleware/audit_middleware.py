@@ -334,8 +334,8 @@ class AuditMiddleware(BaseHTTPMiddleware):
                     return json.dumps(masked_body, ensure_ascii=False)
                 except json.JSONDecodeError:
                     return "[Invalid JSON]"
-            elif "application/x-www-form-urlencoded" in content_type or "multipart/form-data" in content_type:
-                # 表单数据，记录为字符串
+            elif "application/x-www-form-urlencoded" in content_type:
+                # URL编码的表单数据，记录为字符串
                 body = await request.body()
                 if len(body) > self.MAX_BODY_SIZE:
                     return f"[Body too large: {len(body)} bytes]"
@@ -346,6 +346,11 @@ class AuditMiddleware(BaseHTTPMiddleware):
                 request._receive = receive
                 
                 return body.decode('utf-8', errors='ignore')[:1000]  # 限制长度
+            elif "multipart/form-data" in content_type:
+                # 文件上传请求，不读取整个请求体（避免阻塞）
+                # 只记录文件上传的元数据
+                # 注意：不缓存请求体，让FastAPI正常处理文件上传
+                return "[File upload - body not logged]"
             else:
                 # 其他类型，不记录或只记录大小
                 return None

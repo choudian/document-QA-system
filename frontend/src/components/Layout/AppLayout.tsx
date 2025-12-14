@@ -7,6 +7,7 @@ import {
   UsergroupAddOutlined,
   SettingOutlined,
   FileTextOutlined,
+  FolderOutlined,
 } from '@ant-design/icons'
 import { ReactNode, useState, useEffect } from 'react'
 import { meApi, Permission } from '@/api/me'
@@ -55,7 +56,7 @@ const AppLayout = ({ children }: AppLayoutProps) => {
       key: '/users',
       icon: <UserOutlined />,
       label: '用户管理',
-      permission: 'system:user:read',
+      permission: 'system:user:menu',
     },
     {
       key: '/permissions',
@@ -80,6 +81,12 @@ const AppLayout = ({ children }: AppLayoutProps) => {
       icon: <FileTextOutlined />,
       label: '审计日志',
       permission: 'system:audit:read',
+    },
+    {
+      key: '/documents',
+      icon: <FolderOutlined />,
+      label: '文档管理',
+      permission: 'doc:file:read',
     },
   ]
 

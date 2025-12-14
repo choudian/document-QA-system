@@ -43,8 +43,9 @@ def init_permissions(db: Session):
     # 系统级权限（系统管理员使用）
     system_permissions = [
         # 租户管理
-        {"code": "system:tenant:create", "name": "创建租户", "description": "创建新租户", "type": "menu", "module": "system", "tenant_id": None},
-        {"code": "system:tenant:read", "name": "查看租户", "description": "查看租户列表和详情", "type": "menu", "module": "system", "tenant_id": None},
+        {"code": "system:tenant:menu", "name": "租户管理菜单", "description": "租户管理菜单权限", "type": "menu", "module": "system", "tenant_id": None},
+        {"code": "system:tenant:create", "name": "创建租户", "description": "创建新租户", "type": "button", "module": "system", "tenant_id": None},
+        {"code": "system:tenant:read", "name": "查看租户", "description": "查看租户列表和详情", "type": "api", "module": "system", "tenant_id": None},
         {"code": "system:tenant:update", "name": "更新租户", "description": "更新租户信息", "type": "api", "module": "system", "tenant_id": None},
         {"code": "system:tenant:delete", "name": "删除租户", "description": "删除租户", "type": "api", "module": "system", "tenant_id": None},
         {"code": "system:tenant:create_admin", "name": "创建租户管理员", "description": "创建租户管理员按钮权限", "type": "button", "module": "system", "tenant_id": None},
@@ -53,8 +54,9 @@ def init_permissions(db: Session):
     # 租户级权限（租户管理员和普通用户使用）
     tenant_permissions = [
         # 用户管理
+        {"code": "system:user:menu", "name": "用户管理菜单", "description": "用户管理菜单权限", "type": "menu", "module": "system", "tenant_id": None},
         {"code": "system:user:create", "name": "创建用户", "description": "创建新用户", "type": "button", "module": "system", "tenant_id": None},
-        {"code": "system:user:read", "name": "查看用户", "description": "查看用户列表和详情", "type": "menu", "module": "system", "tenant_id": None},
+        {"code": "system:user:read", "name": "查看用户", "description": "查看用户列表和详情", "type": "api", "module": "system", "tenant_id": None},
         {"code": "system:user:update", "name": "更新用户", "description": "更新用户信息", "type": "api", "module": "system", "tenant_id": None},
         {"code": "system:user:delete", "name": "删除用户", "description": "删除用户", "type": "api", "module": "system", "tenant_id": None},
         {"code": "system:user:assign_role", "name": "为用户分配角色", "description": "为用户分配角色", "type": "api", "module": "system", "tenant_id": None},
@@ -84,6 +86,16 @@ def init_permissions(db: Session):
         # 系统管理（额度/速率限制等）
         {"code": "system:admin:read", "name": "查看系统管理信息", "description": "查看额度、速率限制等系统管理信息", "type": "api", "module": "system", "tenant_id": None},
         {"code": "system:admin:update", "name": "更新系统管理配置", "description": "更新额度、速率限制等系统管理配置", "type": "api", "module": "system", "tenant_id": None},
+        
+        # 文档管理（普通用户使用）
+        {"code": "doc:file:read", "name": "查看文档", "description": "查看文档列表和详情", "type": "menu", "module": "doc", "tenant_id": None},
+        {"code": "doc:file:upload", "name": "上传文档", "description": "上传文档", "type": "button", "module": "doc", "tenant_id": None},
+        {"code": "doc:file:update", "name": "更新文档", "description": "更新文档信息（如标签）", "type": "api", "module": "doc", "tenant_id": None},
+        {"code": "doc:file:delete", "name": "删除文档", "description": "删除文档", "type": "api", "module": "doc", "tenant_id": None},
+        {"code": "doc:folder:create", "name": "创建文件夹", "description": "创建文件夹", "type": "button", "module": "doc", "tenant_id": None},
+        {"code": "doc:folder:read", "name": "查看文件夹", "description": "查看文件夹列表和详情", "type": "api", "module": "doc", "tenant_id": None},
+        {"code": "doc:folder:update", "name": "更新文件夹", "description": "更新文件夹信息（如重命名）", "type": "api", "module": "doc", "tenant_id": None},
+        {"code": "doc:folder:delete", "name": "删除文件夹", "description": "删除文件夹", "type": "api", "module": "doc", "tenant_id": None},
     ]
     
     all_permissions = system_permissions + tenant_permissions
@@ -135,12 +147,14 @@ def init_roles(db: Session):
         # 系统管理员需要的权限：租户管理、用户管理、角色管理、配置管理的权限
         system_admin_permission_codes = [
             # 租户管理
+            "system:tenant:menu",
             "system:tenant:create",
             "system:tenant:read",
             "system:tenant:update",
             "system:tenant:delete",
             "system:tenant:create_admin",
             # 用户管理
+            "system:user:menu",
             "system:user:create",
             "system:user:read",
             "system:user:update",
@@ -199,6 +213,188 @@ def init_roles(db: Session):
             logger.info(f"为 {assigned_count} 个系统管理员用户分配了角色")
         else:
             logger.info("所有系统管理员用户已分配角色")
+    
+    # 创建"租户管理员"角色模板（系统级，供租户管理员使用）
+    tenant_admin_role_template = role_repo.get_by_name_in_tenant(None, "租户管理员")
+    
+    if not tenant_admin_role_template:
+        logger.info("开始创建租户管理员角色模板...")
+        
+        # 创建租户管理员角色模板（系统级，tenant_id=None，作为模板）
+        tenant_admin_role_template = Role(
+            tenant_id=None,  # 系统级模板
+            name="租户管理员",
+            description="租户管理员角色，可以管理租户内的用户、角色、配置等",
+            status=True,
+        )
+        role_repo.add(tenant_admin_role_template)
+        role_repo.flush()
+        
+        # 租户管理员需要的权限：用户管理、角色管理、配置管理等
+        tenant_admin_permission_codes = [
+            # 租户管理（查看自己的租户信息，但不显示菜单，因为租户管理员不需要管理租户）
+            "system:tenant:read",
+            # 用户管理
+            "system:user:menu",
+            "system:user:create",
+            "system:user:read",
+            "system:user:update",
+            "system:user:delete",
+            "system:user:assign_role",
+            # 角色管理
+            "system:role:create",
+            "system:role:read",
+            "system:role:update",
+            "system:role:delete",
+            "system:role:assign_permission",
+            "system:role:assign_user",
+            # 配置管理
+            "system:config:menu",
+            "system:config:read",
+            "system:config:update",
+            # 审计日志
+            "system:audit:read",
+        ]
+        
+        # 查询这些权限
+        permissions = []
+        for code in tenant_admin_permission_codes:
+            permission = permission_repo.get_by_code(code)
+            if permission:
+                permissions.append(permission)
+        
+        # 为角色分配权限
+        tenant_admin_role_template.permissions = permissions
+        role_repo.commit()
+        logger.info(f"成功创建租户管理员角色模板，并分配了 {len(permissions)} 个权限")
+    else:
+        logger.info("租户管理员角色模板已存在，检查权限分配...")
+        # 如果角色已存在，检查是否缺少必要的权限，如果缺少则添加
+        existing_permission_codes = {perm.code for perm in tenant_admin_role_template.permissions}
+        required_permission_codes = {
+            # 注意：租户管理员不需要 system:tenant:menu，只需要 system:tenant:read 来查看自己的租户信息
+            "system:tenant:read",
+            "system:user:menu",
+            "system:user:create",
+            "system:user:read",
+            "system:user:update",
+            "system:user:delete",
+            "system:user:assign_role",
+            "system:role:create",
+            "system:role:read",
+            "system:role:update",
+            "system:role:delete",
+            "system:role:assign_permission",
+            "system:role:assign_user",
+            "system:config:menu",
+            "system:config:read",
+            "system:config:update",
+            "system:audit:read",
+        }
+        missing_permissions = required_permission_codes - existing_permission_codes
+        if missing_permissions:
+            logger.info(f"为租户管理员角色添加缺失的权限: {missing_permissions}")
+            for code in missing_permissions:
+                permission = permission_repo.get_by_code(code)
+                if permission:
+                    tenant_admin_role_template.permissions.append(permission)
+            role_repo.commit()
+            logger.info(f"已为租户管理员角色添加 {len(missing_permissions)} 个权限")
+    
+    # 为所有已存在的租户管理员用户分配该角色
+    tenant_admin_users = db.query(User).filter(User.is_tenant_admin == True).all()
+    if tenant_admin_users:
+        assigned_count = 0
+        for user in tenant_admin_users:
+            # 检查用户是否已经有这个角色
+            user_has_role = any(role.id == tenant_admin_role_template.id for role in user.roles)
+            if not user_has_role:
+                # 如果用户还没有这个角色，添加角色（保留其他角色）
+                if user.roles:
+                    user.roles.append(tenant_admin_role_template)
+                else:
+                    user.roles = [tenant_admin_role_template]
+                assigned_count += 1
+        if assigned_count > 0:
+            user_repo.commit()
+            logger.info(f"为 {assigned_count} 个租户管理员用户分配了角色")
+    
+    # 创建"成员"角色模板（系统级，供租户管理员参考）
+    # 注意：实际使用时，每个租户需要创建自己的"成员"角色并分配权限
+    # 这里创建系统级模板，租户管理员可以参考这个模板为租户创建角色
+    member_role_template = role_repo.get_by_name_in_tenant(None, "成员")
+    
+    if not member_role_template:
+        logger.info("开始创建成员角色模板...")
+        
+        # 创建成员角色模板（系统级，tenant_id=None，作为模板）
+        member_role_template = Role(
+            tenant_id=None,  # 系统级模板
+            name="成员",
+            description="普通用户角色，可以上传文档、管理自己的文档和文件夹",
+            status=True,
+        )
+        role_repo.add(member_role_template)
+        role_repo.flush()
+        
+        # 成员角色需要的权限：文档管理相关权限
+        member_permission_codes = [
+            # 文档管理
+            "doc:file:read",
+            "doc:file:upload",
+            "doc:file:update",
+            "doc:file:delete",
+            "doc:folder:create",
+            "doc:folder:read",
+            "doc:folder:update",
+            "doc:folder:delete",
+        ]
+        
+        # 查询这些权限
+        permissions = []
+        for code in member_permission_codes:
+            permission = permission_repo.get_by_code(code)
+            if permission:
+                permissions.append(permission)
+        
+        # 为角色分配权限
+        member_role_template.permissions = permissions
+        role_repo.commit()
+        logger.info(f"成功创建成员角色模板，并分配了 {len(permissions)} 个权限")
+    else:
+        logger.info("成员角色模板已存在，检查权限分配...")
+        # 确保成员角色不包含系统管理权限（如 system:tenant:read）
+        existing_permission_codes = {perm.code for perm in member_role_template.permissions}
+        # 成员角色不应该有的权限
+        forbidden_permissions = {
+            "system:tenant:menu",
+            "system:tenant:read",
+            "system:tenant:create",
+            "system:tenant:update",
+            "system:tenant:delete",
+            "system:user:menu",
+            "system:user:create",
+            "system:user:read",
+            "system:user:update",
+            "system:user:delete",
+            "system:role:create",
+            "system:role:read",
+            "system:role:update",
+            "system:role:delete",
+            "system:config:menu",
+            "system:config:read",
+            "system:config:update",
+        }
+        # 移除不应该有的权限
+        permissions_to_remove = existing_permission_codes & forbidden_permissions
+        if permissions_to_remove:
+            logger.warning(f"成员角色模板包含不应该有的权限: {permissions_to_remove}，正在移除...")
+            member_role_template.permissions = [
+                perm for perm in member_role_template.permissions 
+                if perm.code not in permissions_to_remove
+            ]
+            role_repo.commit()
+            logger.info(f"已从成员角色模板移除 {len(permissions_to_remove)} 个不应该有的权限")
 
 
 def init_system_configs(db: Session):
@@ -245,15 +441,15 @@ def init_system_configs(db: Session):
                 "model": "bge-rerank-base",
             },
         },
-        # Embedding
+        # Embedding（阿里云百炼）
         {
             "category": "embedding",
             "key": "default",
             "value": {
-                "provider": "openai",
-                "base_url": "https://api.openai.com/v1",
-                "api_key": _enc("dummy-api-key"),
-                "model": "text-embedding-3-small",
+                "provider": "aliyun",
+                "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+                "api_key": _enc("sk-0c9c04e50d5b43c6802fb0e1c7426051"),
+                "model": "text-embedding-v4",
             },
         },
         # 向量库
@@ -261,10 +457,10 @@ def init_system_configs(db: Session):
             "category": "vector_store",
             "key": "default",
             "value": {
-                "provider": "pgvector",
-                "base_url": "http://localhost:5432",
-                "api_key": _enc("dummy-api-key"),
-                "collection_prefix": "",
+                "provider": "chroma",
+                "base_url": "",
+                "api_key": "",
+                "collection_prefix": "doc_qa",
             },
         },
         # 文档上传
@@ -327,8 +523,8 @@ def init_menus(db: Session):
     logger.info("开始初始化默认菜单...")
 
     default_menus = [
-        {"name": "租户管理", "path": "/tenants", "icon": "TeamOutlined", "permission_code": "system:tenant:read", "sort_order": 1},
-        {"name": "用户管理", "path": "/users", "icon": "UserOutlined", "permission_code": "system:user:read", "sort_order": 2},
+        {"name": "租户管理", "path": "/tenants", "icon": "TeamOutlined", "permission_code": "system:tenant:menu", "sort_order": 1},
+        {"name": "用户管理", "path": "/users", "icon": "UserOutlined", "permission_code": "system:user:menu", "sort_order": 2},
         {"name": "权限管理", "path": "/permissions", "icon": "SafetyOutlined", "permission_code": "system:permission:read", "sort_order": 3},
         {"name": "角色管理", "path": "/roles", "icon": "UsergroupAddOutlined", "permission_code": "system:role:read", "sort_order": 4},
         {"name": "配置管理", "path": "/configs", "icon": "SettingOutlined", "permission_code": "system:config:menu", "sort_order": 5},

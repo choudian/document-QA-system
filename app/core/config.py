@@ -19,6 +19,13 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "智能文档问答系统"
     API_V1_PREFIX: str = "/api/v1"
     
+    # 存储配置
+    STORAGE_TYPE: str = "filesystem"
+    STORAGE_BASE_PATH: str = "./storage"
+    
+    # 向量库配置
+    VECTOR_STORE_BASE_PATH: str = "./vector_store"
+    
     class Config:
         env_file = ".env"
         case_sensitive = True

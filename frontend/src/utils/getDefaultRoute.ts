@@ -10,10 +10,13 @@ export async function getDefaultRoute(): Promise<string> {
     
     // 定义菜单路径和对应的权限码，按优先级排序
     const menuRoutes = [
-      { path: '/tenants', permission: 'system:tenant:read' },
-      { path: '/users', permission: 'system:user:read' },
+      { path: '/tenants', permission: 'system:tenant:menu' },
+      { path: '/users', permission: 'system:user:menu' },
       { path: '/roles', permission: 'system:role:read' },
       { path: '/permissions', permission: 'system:permission:read' },
+      { path: '/configs', permission: 'system:config:menu' },
+      { path: '/audit-logs', permission: 'system:audit:read' },
+      { path: '/documents', permission: 'doc:file:read' },
     ]
     
     // 查找第一个有权限的菜单
@@ -26,8 +29,8 @@ export async function getDefaultRoute(): Promise<string> {
       }
     }
     
-    // 如果没有找到任何有权限的菜单，默认返回用户管理（租户管理员通常有用户管理权限）
-    return '/users'
+    // 如果没有找到任何有权限的菜单，默认返回文档管理（普通用户通常有文档管理权限）
+    return '/documents'
   } catch (error) {
     console.error('获取默认路由失败:', error)
     // 如果获取权限失败，默认返回用户管理

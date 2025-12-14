@@ -49,13 +49,25 @@ def list_tenants(
 ):
     """
     查询租户列表
+    系统管理员可以查看所有租户，租户管理员只能查看自己的租户
     """
     tenant_service = TenantService(
         tenant_repo=TenantRepository(db),
         user_repo=UserRepository(db),
         password_hasher=password_hasher,
     )
-    return tenant_service.list_tenants(skip=skip, limit=limit, status_filter=status)
+    
+    # 系统管理员可以查看所有租户
+    if current_user.is_system_admin:
+        return tenant_service.list_tenants(skip=skip, limit=limit, status_filter=status)
+    
+    # 租户管理员只能查看自己的租户
+    if current_user.is_tenant_admin and current_user.tenant_id:
+        tenant = tenant_service.get_tenant(current_user.tenant_id)
+        return [tenant]
+    
+    # 普通用户不应该有 system:tenant:read 权限，但如果通过了权限检查，返回空列表
+    return []
 
 
 @router.get("/{tenant_id}", response_model=TenantResponse)

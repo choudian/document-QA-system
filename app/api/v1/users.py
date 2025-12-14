@@ -92,9 +92,109 @@ def create_user(
         is_tenant_admin=False,  # 创建时默认为False，后续通过角色分配自动更新
     )
     db.add(db_user)
-    db.commit()
-    db.refresh(db_user)
-    return db_user
+    db.flush()  # 先flush获取用户ID
+    
+    # 为新创建的用户自动分配"成员"角色（新创建的用户默认不是租户管理员）
+    # 注意：租户管理员需要通过角色分配来设置，创建时默认为普通用户
+    if not db_user.is_tenant_admin:
+        from app.repositories.role_repository import RoleRepository
+        from app.repositories.permission_repository import PermissionRepository
+        role_repo = RoleRepository(db)
+        permission_repo = PermissionRepository(db)
+        
+        # 查找租户下的"成员"角色
+        member_role = role_repo.get_by_name_in_tenant(user.tenant_id, "成员")
+        
+        if not member_role:
+            # 如果租户下没有，查找系统级模板
+            template_role = role_repo.get_by_name_in_tenant(None, "成员")
+            
+            if template_role:
+                # 基于模板创建租户级的"成员"角色
+                from app.models.role import Role
+                tenant_member_role = Role(
+                    tenant_id=user.tenant_id,
+                    name="成员",
+                    description="普通用户角色，可以上传文档、管理自己的文档和文件夹",
+                    status=True,
+                )
+                role_repo.add(tenant_member_role)
+                db.flush()
+                
+                # 复制权限：通过权限码查询权限，然后分配
+                # 这样避免 SQLAlchemy 关系对象的复制问题
+                doc_permission_codes = [
+                    "doc:file:read",
+                    "doc:file:upload",
+                    "doc:file:update",
+                    "doc:file:delete",
+                    "doc:folder:create",
+                    "doc:folder:read",
+                    "doc:folder:update",
+                    "doc:folder:delete",
+                ]
+                permissions = []
+                for code in doc_permission_codes:
+                    perm = permission_repo.get_by_code(code)
+                    if perm:
+                        permissions.append(perm)
+                
+                if permissions:
+                    tenant_member_role.permissions = permissions
+                    db.flush()
+                
+                member_role = tenant_member_role
+            else:
+                # 如果连模板都没有，创建一个基本的成员角色
+                from app.models.role import Role
+                member_role = Role(
+                    tenant_id=user.tenant_id,
+                    name="成员",
+                    description="普通用户角色，可以上传文档、管理自己的文档和文件夹",
+                    status=True,
+                )
+                # 分配文档管理权限
+                doc_permission_codes = [
+                    "doc:file:read",
+                    "doc:file:upload",
+                    "doc:file:update",
+                    "doc:file:delete",
+                    "doc:folder:create",
+                    "doc:folder:read",
+                    "doc:folder:update",
+                    "doc:folder:delete",
+                ]
+                permissions = []
+                for code in doc_permission_codes:
+                    perm = permission_repo.get_by_code(code)
+                    if perm:
+                        permissions.append(perm)
+                member_role.permissions = permissions
+                role_repo.add(member_role)
+                db.flush()
+        
+        # 为用户分配角色
+        if member_role:
+            db_user.roles = [member_role]
+        else:
+            # 如果没有找到成员角色，记录警告但不阻止创建用户
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"未找到'成员'角色，用户 {db_user.id} 创建时未分配角色")
+    
+    try:
+        db.commit()
+        db.refresh(db_user)
+        return db_user
+    except Exception as e:
+        db.rollback()
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"创建用户失败: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"创建用户失败: {str(e)}"
+        )
 
 
 @router.get("", response_model=List[UserResponse])

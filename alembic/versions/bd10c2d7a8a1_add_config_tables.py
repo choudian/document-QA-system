@@ -1,7 +1,7 @@
 """add config tables
 
 Revision ID: bd10c2d7a8a1
-Revises: add_menus_table
+Revises: f6709dc3d64d
 Create Date: 2025-01-15 12:00:00.000000
 
 """
@@ -13,7 +13,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = 'bd10c2d7a8a1'
-down_revision: Union[str, None] = 'add_menus_table'
+down_revision: Union[str, None] = 'f6709dc3d64d'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

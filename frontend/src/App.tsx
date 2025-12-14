@@ -13,6 +13,7 @@ import RoleForm from './pages/RoleForm'
 import Login from './pages/Login'
 import ConfigPage from './pages/ConfigPage'
 import AuditLogPage from './pages/AuditLogPage'
+import DocumentList from './pages/DocumentList'
 import './App.css'
 
 const { Content } = Layout
@@ -52,6 +53,7 @@ function App() {
                     <Route path="/roles/:id/edit" element={<RoleForm />} />
                     <Route path="/configs" element={<ConfigPage />} />
                     <Route path="/audit-logs" element={<AuditLogPage />} />
+                    <Route path="/documents" element={<DocumentList />} />
                   </Routes>
                 </Content>
               </AppLayout>
