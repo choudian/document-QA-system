@@ -33,7 +33,8 @@ class Message(Base):
     total_tokens = Column(Integer, nullable=True, comment="总Token数量")
     
     # 元数据（JSON格式，存储额外的元数据）
-    metadata = Column(JSON, nullable=True, comment="元数据（JSON格式）")
+    # 注意：metadata是SQLAlchemy保留字，使用message_metadata作为属性名，数据库列名仍为metadata
+    message_metadata = Column("metadata", JSON, nullable=True, comment="元数据（JSON格式）")
     
     # 排序序号（用于保持消息顺序）
     sequence = Column(Integer, nullable=False, comment="排序序号")

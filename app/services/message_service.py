@@ -50,7 +50,7 @@ class MessageService:
             prompt_tokens=prompt_tokens,
             completion_tokens=completion_tokens,
             total_tokens=total_tokens,
-            metadata=metadata,
+            message_metadata=metadata,
             sequence=sequence
         )
         return self.message_repo.create(message)

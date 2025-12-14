@@ -1,19 +1,19 @@
 """
-Embedding服务
+Embedding服务 - 基于LangChain实现
 """
 from typing import List, Dict, Any, Optional
-import httpx
-from app.services.config_service import ConfigService
-from app.repositories.config_repository import ConfigRepository
 import json
 import base64
 import logging
+from langchain_openai import OpenAIEmbeddings
+from app.services.config_service import ConfigService
+from app.repositories.config_repository import ConfigRepository
 
 logger = logging.getLogger(__name__)
 
 
 class EmbeddingService:
-    """Embedding服务"""
+    """Embedding服务 - 基于LangChain"""
     
     def __init__(self, config_service: ConfigService, config_repo: Optional[ConfigRepository] = None):
         self.config_service = config_service
@@ -36,7 +36,6 @@ class EmbeddingService:
                 configs = self.config_repo.list_system_configs(tenant_id)
                 for cfg in configs:
                     if cfg.category == "embedding" and cfg.key == "default":
-                        import json
                         value = json.loads(cfg.value)
                         # 解密敏感字段
                         if "api_key" in value and isinstance(value["api_key"], str):
@@ -47,7 +46,6 @@ class EmbeddingService:
             configs = self.config_repo.list_system_configs(None)
             for cfg in configs:
                 if cfg.category == "embedding" and cfg.key == "default":
-                    import json
                     value = json.loads(cfg.value)
                     # 解密敏感字段
                     if "api_key" in value and isinstance(value["api_key"], str):
@@ -78,6 +76,26 @@ class EmbeddingService:
                 return text
         return text
     
+    def _create_embeddings(self, config: Dict[str, Any]) -> OpenAIEmbeddings:
+        """创建OpenAIEmbeddings实例"""
+        base_url = config.get("base_url", "https://api.openai.com/v1")
+        api_key = config.get("api_key", "")
+        model = config.get("model", "text-embedding-3-small")
+        
+        # 解密API key
+        if api_key.startswith("ENC:"):
+            api_key = self._decrypt(api_key)
+        
+        # LangChain OpenAIEmbeddings支持自定义base_url和api_key
+        # 注意：LangChain使用openai_api_key和openai_api_base参数
+        # 使用 OpenAI API 格式，兼容所有支持 OpenAI API 的提供商
+        return OpenAIEmbeddings(
+            model=model,
+            openai_api_key=api_key,
+            openai_api_base=base_url,
+            check_embedding_ctx_length=False,  # 禁用默认分词处理，兼容更多提供商
+        )
+    
     async def embed_text(self, text: str, tenant_id: Optional[str] = None) -> List[float]:
         """
         对单个文本进行embedding
@@ -89,8 +107,30 @@ class EmbeddingService:
         Returns:
             向量列表
         """
+        # 验证输入参数
+        if text is None:
+            raise ValueError("text参数不能为None")
+        if not isinstance(text, str):
+            raise ValueError(f"text参数必须是字符串类型，当前类型: {type(text)}")
+        if not text.strip():
+            raise ValueError("text参数不能为空字符串")
+        
         config = self.get_embedding_config(tenant_id)
-        return await self._embed_with_config(text, config)
+        embeddings = self._create_embeddings(config)
+        
+        try:
+            # LangChain的embed_query是同步的，需要在线程池中运行
+            import asyncio
+            loop = asyncio.get_event_loop()
+            # 确保text是字符串类型
+            text_str = str(text).strip()
+            if not text_str:
+                raise ValueError("text参数不能为空")
+            vector = await loop.run_in_executor(None, embeddings.embed_query, text_str)
+            return vector
+        except Exception as e:
+            logger.error(f"Embedding调用失败: text={repr(text)}, type={type(text)}, error={e}", exc_info=True)
+            raise
     
     async def embed_batch(self, texts: List[str], tenant_id: Optional[str] = None) -> List[List[float]]:
         """
@@ -108,115 +148,28 @@ class EmbeddingService:
         
         config = self.get_embedding_config(tenant_id)
         provider = config.get("provider", "openai")
-        
-        if provider == "openai" or provider == "aliyun":
-            # 阿里云使用OpenAI兼容接口
-            return await self._embed_batch_openai(texts, config)
-        else:
-            # 其他provider暂时逐个调用
-            results = []
-            for text in texts:
-                vector = await self._embed_with_config(text, config)
-                results.append(vector)
-            return results
-    
-    async def _embed_with_config(self, text: str, config: Dict[str, Any]) -> List[float]:
-        """使用配置进行embedding"""
-        provider = config.get("provider", "openai")
-        
-        if provider == "openai" or provider == "aliyun":
-            # 阿里云使用OpenAI兼容接口
-            return await self._embed_openai(text, config)
-        else:
-            raise ValueError(f"不支持的embedding provider: {provider}")
-    
-    async def _embed_openai(self, text: str, config: Dict[str, Any]) -> List[float]:
-        """使用OpenAI API进行embedding（也支持阿里云等兼容OpenAI接口的服务）"""
-        base_url = config.get("base_url", "https://api.openai.com/v1")
-        api_key = config.get("api_key", "")
-        model = config.get("model", "text-embedding-3-small")
-        
-        # API key应该已经在get_embedding_config中解密了
-        # 这里只需要处理ENC:前缀的情况（以防万一）
-        if api_key.startswith("ENC:"):
-            try:
-                api_key = base64.b64decode(api_key[4:].encode("utf-8")).decode("utf-8")
-            except Exception:
-                pass
-        
-        url = f"{base_url}/embeddings"
-        headers = {
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json"
-        }
-        data = {
-            "input": text,
-            "model": model
-        }
-        
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.post(url, headers=headers, json=data)
-            response.raise_for_status()
-            result = response.json()
-            return result["data"][0]["embedding"]
-    
-    async def _embed_batch_openai(self, texts: List[str], config: Dict[str, Any]) -> List[List[float]]:
-        """使用OpenAI API批量embedding（也支持阿里云等兼容OpenAI接口的服务）"""
-        base_url = config.get("base_url", "https://api.openai.com/v1")
-        api_key = config.get("api_key", "")
-        model = config.get("model", "text-embedding-3-small")
-        provider = config.get("provider", "openai")
-        
-        # API key应该已经在get_embedding_config中解密了
-        if api_key.startswith("ENC:"):
-            try:
-                api_key = base64.b64decode(api_key[4:].encode("utf-8")).decode("utf-8")
-            except Exception:
-                pass
+        embeddings = self._create_embeddings(config)
         
         # 阿里云限制批量大小不能超过10
         batch_size = 10 if provider == "aliyun" else 2048  # OpenAI支持更大的批量
         
-        # 如果文本数量超过批量大小，需要分批处理
-        if len(texts) <= batch_size:
-            return await self._embed_batch_single(texts, base_url, api_key, model)
-        else:
-            # 分批处理
-            all_vectors = []
-            for i in range(0, len(texts), batch_size):
-                batch_texts = texts[i:i + batch_size]
-                logger.debug(f"分批embedding: {i+1}-{min(i+batch_size, len(texts))}/{len(texts)}")
-                batch_vectors = await self._embed_batch_single(batch_texts, base_url, api_key, model)
-                all_vectors.extend(batch_vectors)
-            return all_vectors
-    
-    async def _embed_batch_single(self, texts: List[str], base_url: str, api_key: str, model: str) -> List[List[float]]:
-        """执行单次批量embedding请求"""
-        url = f"{base_url}/embeddings"
-        headers = {
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json"
-        }
-        data = {
-            "input": texts,
-            "model": model
-        }
-        
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            try:
-                logger.debug(f"调用embedding API: {url}, model: {model}, texts数量: {len(texts)}")
-                response = await client.post(url, headers=headers, json=data)
-                response.raise_for_status()
-                result = response.json()
-                return [item["embedding"] for item in result["data"]]
-            except httpx.HTTPStatusError as e:
-                # 记录详细的错误信息
-                error_detail = ""
-                if e.response is not None:
-                    try:
-                        error_detail = e.response.json()
-                    except:
-                        error_detail = e.response.text[:500]  # 限制长度
-                logger.error(f"Embedding API调用失败: {e.response.status_code if e.response else 'N/A'}, URL: {url}, Model: {model}, 错误详情: {error_detail}")
-                raise
-
+        try:
+            import asyncio
+            loop = asyncio.get_event_loop()
+            
+            # 如果文本数量超过批量大小，需要分批处理
+            if len(texts) <= batch_size:
+                vectors = await loop.run_in_executor(None, embeddings.embed_documents, texts)
+                return vectors
+            else:
+                # 分批处理
+                all_vectors = []
+                for i in range(0, len(texts), batch_size):
+                    batch_texts = texts[i:i + batch_size]
+                    logger.debug(f"分批embedding: {i+1}-{min(i+batch_size, len(texts))}/{len(texts)}")
+                    batch_vectors = await loop.run_in_executor(None, embeddings.embed_documents, batch_texts)
+                    all_vectors.extend(batch_vectors)
+                return all_vectors
+        except Exception as e:
+            logger.error(f"批量Embedding调用失败: {e}", exc_info=True)
+            raise

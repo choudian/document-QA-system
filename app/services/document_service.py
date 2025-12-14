@@ -3,7 +3,7 @@
 """
 import logging
 from typing import Optional, Dict, Any, List
-from fastapi import BackgroundTasks
+from fastapi import BackgroundTasks, HTTPException, status
 from app.repositories.document_repository import DocumentRepository
 from app.repositories.document_version_repository import DocumentVersionRepository
 from app.repositories.document_config_repository import DocumentConfigRepository
@@ -50,6 +50,34 @@ class DocumentService:
         self.config_service = config_service
         self.domain_service = DocumentDomainService(config_service)
     
+    def _get_upload_config(self, tenant_id: str) -> Dict[str, Any]:
+        """获取上传配置（系统/租户级）"""
+        effective_config = self.config_service.get_effective_config(tenant_id, None)
+        upload_config = effective_config.get("doc", {}).get("upload", {})
+        
+        # 如果没有配置，返回默认值
+        if not upload_config:
+            return {
+                "upload_types": ["txt", "md", "pdf", "word"],
+                "max_file_size_mb": 50
+            }
+        
+        return upload_config
+    
+    def _get_chunk_config(self, tenant_id: str) -> Dict[str, Any]:
+        """获取文本切分配置（系统/租户级）"""
+        effective_config = self.config_service.get_effective_config(tenant_id, None)
+        chunk_config = effective_config.get("doc", {}).get("chunk", {})
+        
+        # 如果没有配置，返回默认值
+        if not chunk_config:
+            return {
+                "strategy": "fixed",
+                "size": 400,
+                "overlap": 100
+            }
+        
+        return chunk_config
     
     def check_duplicate(
         self,

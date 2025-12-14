@@ -14,6 +14,7 @@ import Login from './pages/Login'
 import ConfigPage from './pages/ConfigPage'
 import AuditLogPage from './pages/AuditLogPage'
 import DocumentList from './pages/DocumentList'
+import QAPage from './pages/QAPage'
 import './App.css'
 
 const { Content } = Layout
@@ -54,6 +55,7 @@ function App() {
                     <Route path="/configs" element={<ConfigPage />} />
                     <Route path="/audit-logs" element={<AuditLogPage />} />
                     <Route path="/documents" element={<DocumentList />} />
+                    <Route path="/qa" element={<QAPage />} />
                   </Routes>
                 </Content>
               </AppLayout>

@@ -16,10 +16,12 @@ from app.repositories.conversation_repository import ConversationRepository
 from app.repositories.message_repository import MessageRepository
 from app.repositories.folder_repository import FolderRepository
 from app.repositories.document_chunk_repository import DocumentChunkRepository
+from app.repositories.document_repository import DocumentRepository
 from app.repositories.config_repository import ConfigRepository
 from app.services.conversation_service import ConversationService
 from app.services.message_service import MessageService
 from app.services.retrieval_service import RetrievalService
+from app.services.reranker_service import RerankerService
 from app.services.llm_service import LLMService
 from app.services.qa_service import QAService
 from app.services.embedding_service import EmbeddingService
@@ -39,16 +41,20 @@ def _build_qa_service(db: Session) -> QAService:
     message_repo = MessageRepository(db)
     folder_repo = FolderRepository(db)
     chunk_repo = DocumentChunkRepository(db)
+    document_repo = DocumentRepository(db)
     
     conversation_service = ConversationService(conversation_repo)
     message_service = MessageService(message_repo, conversation_repo)
     
     embedding_service = EmbeddingService(config_service, config_repo)
+    reranker_service = RerankerService(config_service, config_repo)
     retrieval_service = RetrievalService(
         embedding_service=embedding_service,
         config_service=config_service,
         folder_repo=folder_repo,
-        chunk_repo=chunk_repo
+        chunk_repo=chunk_repo,
+        document_repo=document_repo,
+        reranker_service=reranker_service
     )
     
     llm_service = LLMService(config_service, config_repo)

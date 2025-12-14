@@ -4,10 +4,12 @@
 import logging
 from typing import List, Dict, Any, Optional
 from app.services.embedding_service import EmbeddingService
+from app.services.reranker_service import RerankerService
 from app.services.config_service import ConfigService
 from app.core.vector_store.vector_store_factory import VectorStoreFactory
 from app.repositories.folder_repository import FolderRepository
 from app.repositories.document_chunk_repository import DocumentChunkRepository
+from app.repositories.document_repository import DocumentRepository
 
 logger = logging.getLogger(__name__)
 
@@ -20,12 +22,16 @@ class RetrievalService:
         embedding_service: EmbeddingService,
         config_service: ConfigService,
         folder_repo: FolderRepository,
-        chunk_repo: DocumentChunkRepository
+        chunk_repo: DocumentChunkRepository,
+        document_repo: Optional[DocumentRepository] = None,
+        reranker_service: Optional[RerankerService] = None
     ):
         self.embedding_service = embedding_service
         self.config_service = config_service
         self.folder_repo = folder_repo
         self.chunk_repo = chunk_repo
+        self.document_repo = document_repo
+        self.reranker_service = reranker_service
     
     def _get_all_folder_ids(self, folder_id: str, tenant_id: str, user_id: str) -> List[str]:
         """获取文件夹及其所有子文件夹的ID列表"""
@@ -73,6 +79,12 @@ class RetrievalService:
             - similarity: 相似度分数
             - metadata: 元数据（包含文档名称、标题等）
         """
+        # 验证查询参数
+        if not query:
+            raise ValueError("查询文本不能为空")
+        if not isinstance(query, str):
+            raise ValueError(f"查询文本必须是字符串类型，当前类型: {type(query)}")
+        
         # 1. 对查询文本进行embedding
         query_vector = await self.embedding_service.embed_text(query, tenant_id)
         
@@ -164,16 +176,98 @@ class RetrievalService:
         # 4. 按相似度排序
         all_results.sort(key=lambda x: x["similarity"], reverse=True)
         
-        # 5. 如果启用了重排序，进行重排序（目前先简化，后续可以实现）
-        if use_rerank and rerank_top_n:
-            # TODO: 实现重排序逻辑
-            # 目前先取前rerank_top_n个
-            all_results = all_results[:rerank_top_n]
+        # 5. 如果启用了重排序，调用reranker服务
+        if use_rerank and self.reranker_service and rerank_top_n:
+            try:
+                # 准备重排序的文档列表（取前top_k个，用于重排序）
+                candidate_results = all_results[:top_k * 2] if len(all_results) > top_k else all_results
+                
+                # 提取文档内容用于重排序
+                documents_for_rerank = [result["content"] for result in candidate_results]
+                
+                # 调用reranker
+                reranked = await self.reranker_service.rerank(
+                    query=query,
+                    documents=documents_for_rerank,
+                    tenant_id=tenant_id,
+                    user_id=user_id,
+                    top_n=rerank_top_n
+                )
+                
+                # 根据reranker返回的结果重新排序
+                # reranked返回的是按相关性排序的结果，包含index和relevance_score
+                reranked_map = {item["index"]: item for item in reranked}
+                reranked_results = []
+                
+                # 按照reranker返回的顺序和分数重组结果
+                for rerank_item in reranked:
+                    original_index = rerank_item["index"]
+                    if original_index < len(candidate_results):
+                        original_result = candidate_results[original_index].copy()
+                        # 更新相似度分数为reranker的分数
+                        original_result["similarity"] = rerank_item["relevance_score"]
+                        original_result["rerank_score"] = rerank_item["relevance_score"]
+                        reranked_results.append(original_result)
+                
+                # 如果reranker返回的结果少于requested top_n，补充剩余的结果（按原始相似度）
+                if len(reranked_results) < rerank_top_n:
+                    used_indices = set(item["index"] for item in reranked)
+                    for i, result in enumerate(candidate_results):
+                        if i not in used_indices and len(reranked_results) < rerank_top_n:
+                            reranked_results.append(result)
+                
+                all_results = reranked_results
+            except Exception as e:
+                logger.error(f"Reranker调用失败，使用原始排序结果: {e}", exc_info=True)
+                # 如果reranker失败，回退到原始排序
+                all_results = all_results[:top_k]
         else:
             # 只取top_k个
             all_results = all_results[:top_k]
         
-        # 6. 补充文档信息（如果需要的话，可以从document_repo获取）
-        # 这里先返回基本信息，后续可以根据需要补充
+        # 6. 补充文档信息（从document_repo获取文档名称和标题）
+        if self.document_repo and all_results:
+            document_ids = list(set([r["document_id"] for r in all_results if r.get("document_id")]))
+            logger.info(f"需要补充文档信息的文档ID列表: {document_ids}")
+            if document_ids:
+                documents_map = {}
+                for doc_id in document_ids:
+                    try:
+                        doc = self.document_repo.get_by_id(doc_id, tenant_id)
+                        if doc:
+                            documents_map[doc_id] = {
+                                "name": doc.name,
+                                "original_name": doc.original_name,
+                                "title": doc.title
+                            }
+                            logger.info(f"获取文档信息成功: {doc_id} -> {doc.name}")
+                        else:
+                            logger.warning(f"文档 {doc_id} 不存在或已删除 (tenant_id: {tenant_id})")
+                    except Exception as e:
+                        logger.warning(f"获取文档 {doc_id} 信息失败: {e}", exc_info=True)
+                        continue
+                
+                logger.info(f"成功获取 {len(documents_map)} 个文档的信息")
+                
+                # 为每个结果添加文档信息
+                for result in all_results:
+                    doc_id = result.get("document_id")
+                    if doc_id and doc_id in documents_map:
+                        # 确保metadata字典存在
+                        if "metadata" not in result:
+                            result["metadata"] = {}
+                        result["metadata"].update({
+                            "document_name": documents_map[doc_id]["name"],
+                            "document_original_name": documents_map[doc_id]["original_name"],
+                            "document_title": documents_map[doc_id]["title"]
+                        })
+                        logger.info(f"为结果添加文档信息: {doc_id} -> {documents_map[doc_id]['name']}, metadata: {result['metadata']}")
+                    elif doc_id:
+                        logger.warning(f"文档 {doc_id} 不在documents_map中")
+        else:
+            if not self.document_repo:
+                logger.warning("document_repo未初始化，无法获取文档信息")
+            if not all_results:
+                logger.debug("没有检索结果，跳过文档信息补充")
         
         return all_results

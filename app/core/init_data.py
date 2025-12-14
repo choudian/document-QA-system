@@ -435,39 +435,42 @@ def init_system_configs(db: Session):
         logger.info("系统配置已存在，跳过初始化")
         return
 
+    # 阿里云 DashScope API Key（与 embedding 共用）
+    dashscope_api_key = "sk-0c9c04e50d5b43c6802fb0e1c7426051"
+    
     default_configs = [
-        # LLM（对象）
+        # LLM（阿里云 DashScope）
         {
             "category": "llm",
             "key": "default",
             "value": {
-                "provider": "openai",
-                "base_url": "https://api.openai.com/v1",
-                "api_key": _enc("dummy-api-key"),
-                "model": "gpt-4o-mini",
-                "timeout": 30,
+                "provider": "aliyun",
+                "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+                "api_key": _enc(dashscope_api_key),
+                "model": "qwen3-max",
+                "timeout": 60,
                 "temperature": 0.7,
             },
         },
-        # Rerank
+        # Rerank（阿里云DashScope，与 LLM/Embedding 共用 API Key）
         {
             "category": "rerank",
             "key": "default",
             "value": {
-                "provider": "openai",
-                "base_url": "https://api.openai.com/v1",
-                "api_key": _enc("dummy-api-key"),
-                "model": "bge-rerank-base",
+                "provider": "aliyun",
+                "base_url": "https://dashscope.aliyuncs.com/api/v1/services/rerank/text-rerank/text-rerank",
+                "api_key": _enc(dashscope_api_key),
+                "model": "qwen3-rerank",
             },
         },
-        # Embedding（阿里云百炼）
+        # Embedding（阿里云百炼，与 LLM 共用 API Key）
         {
             "category": "embedding",
             "key": "default",
             "value": {
                 "provider": "aliyun",
                 "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
-                "api_key": _enc("sk-0c9c04e50d5b43c6802fb0e1c7426051"),
+                "api_key": _enc(dashscope_api_key),
                 "model": "text-embedding-v4",
             },
         },
@@ -547,6 +550,8 @@ def init_menus(db: Session):
         {"name": "权限管理", "path": "/permissions", "icon": "SafetyOutlined", "permission_code": "system:permission:read", "sort_order": 3},
         {"name": "角色管理", "path": "/roles", "icon": "UsergroupAddOutlined", "permission_code": "system:role:read", "sort_order": 4},
         {"name": "配置管理", "path": "/configs", "icon": "SettingOutlined", "permission_code": "system:config:menu", "sort_order": 5},
+        {"name": "文档管理", "path": "/documents", "icon": "FileTextOutlined", "permission_code": "doc:file:read", "sort_order": 6},
+        {"name": "问答", "path": "/qa", "icon": "MessageOutlined", "permission_code": "qa:conversation:menu", "sort_order": 7},
     ]
 
     created_count = 0

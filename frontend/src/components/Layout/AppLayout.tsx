@@ -8,6 +8,7 @@ import {
   SettingOutlined,
   FileTextOutlined,
   FolderOutlined,
+  MessageOutlined,
 } from '@ant-design/icons'
 import { ReactNode, useState, useEffect } from 'react'
 import { meApi, Permission } from '@/api/me'
@@ -87,6 +88,12 @@ const AppLayout = ({ children }: AppLayoutProps) => {
       icon: <FolderOutlined />,
       label: '文档管理',
       permission: 'doc:file:read',
+    },
+    {
+      key: '/qa',
+      icon: <MessageOutlined />,
+      label: '问答',
+      permission: 'qa:conversation:menu',
     },
   ]
 

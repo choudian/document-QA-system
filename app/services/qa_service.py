@@ -235,6 +235,7 @@ class QAService:
             rerank_top_n = config.get("rerank_top_n", rerank_top_n)
         
         # 2. 检索相关内容
+        import json
         references = await self.retrieval_service.search(
             query=query,
             tenant_id=tenant_id,
@@ -309,6 +310,7 @@ class QAService:
                     yield chunk
                     break
                 
+                # 如果不是 [DONE]，继续处理并累积内容
                 try:
                     data_json = json.loads(data_str)
                     # 提取content
