@@ -31,6 +31,13 @@ document-QA-system/
 │   └── vite.config.ts    # Vite配置
 ├── alembic/              # 数据库迁移
 ├── docs/                  # 文档
+├── docker/               # Docker配置文件
+│   ├── nginx.conf       # Nginx配置
+│   └── README.md        # Docker部署说明
+├── Dockerfile.backend   # 后端Dockerfile
+├── Dockerfile.frontend  # 前端Dockerfile
+├── docker-compose.yml   # Docker Compose配置（生产）
+├── docker-compose.dev.yml # Docker Compose配置（开发）
 ├── requirements.txt      # Python依赖
 ├── pyproject.toml        # Python项目配置（uv）
 └── README.md             # 项目说明
@@ -56,6 +63,32 @@ document-QA-system/
 - **HTTP客户端**: Axios
 
 ## 快速开始
+
+### 方式一：使用 Docker（推荐）
+
+使用 Docker Compose 一键启动所有服务：
+
+```bash
+# 1. 启动所有服务（数据库、后端、前端）
+docker-compose up -d
+
+# 2. 查看日志
+docker-compose logs -f
+
+# 3. 访问应用
+# 前端: http://localhost:3000
+# 后端API: http://localhost:8000
+# API文档: http://localhost:8000/docs
+```
+
+**开发模式**（支持热重载）：
+```bash
+docker-compose -f docker-compose.dev.yml up -d
+```
+
+详细说明请参考 [docker/README.md](docker/README.md)
+
+### 方式二：本地开发
 
 ### 1. 安装 uv（如果还没有安装）
 

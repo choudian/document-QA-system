@@ -1,0 +1,84 @@
+version: '3.8'
+
+services:
+  # PostgreSQL数据库
+  db:
+    image: postgres:15-alpine
+    container_name: document-qa-db-dev
+    environment:
+      POSTGRES_USER: document_qa
+      POSTGRES_PASSWORD: document_qa_password
+      POSTGRES_DB: document_qa
+    volumes:
+      - postgres_data_dev:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U document_qa"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - document-qa-network-dev
+
+  # 后端服务（开发模式，支持热重载）
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: document-qa-backend-dev
+    environment:
+      DATABASE_URL: postgresql://document_qa:document_qa_password@db:5432/document_qa
+      SECRET_KEY: dev-secret-key
+      ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: 30
+      PROJECT_NAME: 智能文档问答系统
+      API_V1_PREFIX: /api/v1
+      STORAGE_TYPE: filesystem
+      STORAGE_BASE_PATH: /app/storage
+      VECTOR_STORE_BASE_PATH: /app/vector_store
+    volumes:
+      - .:/app
+      - ./storage:/app/storage
+      - ./vector_store:/app/vector_store
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - document-qa-network-dev
+    command: >
+      sh -c "
+        echo '等待数据库就绪...' &&
+        sleep 5 &&
+        echo '运行数据库迁移...' &&
+        alembic upgrade head &&
+        echo '启动应用（开发模式）...' &&
+        uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+      "
+
+  # 前端服务（开发模式）
+  frontend:
+    image: node:20-alpine
+    container_name: document-qa-frontend-dev
+    working_dir: /app
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    networks:
+      - document-qa-network-dev
+    environment:
+      - VITE_API_BASE_URL=http://localhost:8000/api/v1
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+
+volumes:
+  postgres_data_dev:
+
+networks:
+  document-qa-network-dev:
+    driver: bridge

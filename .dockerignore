@@ -1,0 +1,73 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv
+pip-log.txt
+pip-delete-this-directory.txt
+.pytest_cache
+.coverage
+htmlcov/
+*.egg-info/
+dist/
+build/
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 环境变量
+.env
+.env.local
+.env.*.local
+
+# 日志
+*.log
+logs/
+
+# 数据库
+*.db
+*.sqlite
+*.sqlite3
+
+# 存储（运行时数据，不包含在镜像中）
+storage/*
+!storage/.gitkeep
+vector_store/*
+!vector_store/.gitkeep
+
+# 文档
+docs/
+*.md
+!README.md
+
+# Docker
+docker-compose.yml
+Dockerfile*
+.dockerignore
+
+# 其他
+.DS_Store
+Thumbs.db
+*.tmp
+*.bak
