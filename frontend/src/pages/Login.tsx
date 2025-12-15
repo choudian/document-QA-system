@@ -66,10 +66,10 @@ const Login = () => {
             name="phone"
             rules={[
               { required: true, message: '请输入手机号' },
-              { pattern: /^1[3-9]\d{9}$/, message: '请输入有效的11位手机号' },
+              // { pattern: /^1[3-9]\d{9}$/, message: '请输入有效的11位手机号' },
             ]}
           >
-            <Input placeholder="请输入手机号" maxLength={11} />
+            <Input placeholder="请输入手机号" />
           </Form.Item>
 
           <Form.Item
@@ -150,10 +150,10 @@ const Login = () => {
             name="phone"
             rules={[
               { required: true, message: '请输入手机号' },
-              { pattern: /^1[3-9]\d{9}$/, message: '请输入有效的11位手机号' },
+              // { pattern: /^1[3-9]\d{9}$/, message: '请输入有效的11位手机号' },
             ]}
           >
-            <Input placeholder="请输入手机号" maxLength={11} />
+            <Input placeholder="请输入手机号" />
           </Form.Item>
 
           <Form.Item

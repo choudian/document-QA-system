@@ -12,17 +12,17 @@ class UserBase(BaseModel):
     username: str = Field(..., min_length=1, max_length=50, description="用户名")
     phone: str = Field(..., description="手机号（必填，用作登录账号）")
     
-    @field_validator('phone')
-    @classmethod
-    def validate_phone(cls, v):
-        if v is None or v == '':
-            raise ValueError('手机号不能为空')
-        # 简单的手机号验证：11位数字，可以以+86开头
-        phone_pattern = re.compile(r'^(\+86)?1[3-9]\d{9}$')
-        normalized = v.replace('-', '').replace(' ', '')
-        if not phone_pattern.match(normalized):
-            raise ValueError('手机号格式不正确，请输入11位手机号')
-        return normalized
+    # @field_validator('phone')
+    # @classmethod
+    # def validate_phone(cls, v):
+    #     if v is None or v == '':
+    #         raise ValueError('手机号不能为空')
+    #     # 简单的手机号验证：11位数字，可以以+86开头
+    #     phone_pattern = re.compile(r'^(\+86)?1[3-9]\d{9}$')
+    #     normalized = v.replace('-', '').replace(' ', '')
+    #     if not phone_pattern.match(normalized):
+    #         raise ValueError('手机号格式不正确，请输入11位手机号')
+    #     return normalized
 
 
 class UserCreate(UserBase):
@@ -41,16 +41,16 @@ class UserUpdate(BaseModel):
     is_system_admin: Optional[bool] = Field(None, description="是否为系统管理员（租户为空）")
     tenant_id: Optional[str] = Field(None, description="租户ID（仅系统管理员可修改）")
     
-    @field_validator('phone')
-    @classmethod
-    def validate_phone(cls, v):
-        if v is None or v == '':
-            return None
-        # 简单的手机号验证：11位数字，可以以+86开头
-        phone_pattern = re.compile(r'^(\+86)?1[3-9]\d{9}$')
-        if not phone_pattern.match(v.replace('-', '').replace(' ', '')):
-            raise ValueError('手机号格式不正确，请输入11位手机号')
-        return v.replace('-', '').replace(' ', '')
+    # @field_validator('phone')
+    # @classmethod
+    # def validate_phone(cls, v):
+    #     if v is None or v == '':
+    #         return None
+    #     # 简单的手机号验证：11位数字，可以以+86开头
+    #     phone_pattern = re.compile(r'^(\+86)?1[3-9]\d{9}$')
+    #     if not phone_pattern.match(v.replace('-', '').replace(' ', '')):
+    #         raise ValueError('手机号格式不正确，请输入11位手机号')
+    #     return v.replace('-', '').replace(' ', '')
 
 
 class UserResponse(UserBase):
