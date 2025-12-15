@@ -189,6 +189,36 @@ npm run dev
 
 **注意**：前端开发服务器已配置代理，API 请求会自动转发到后端（http://localhost:8000）
 
+### 7. 运行测试
+
+**后端测试**：
+```bash
+# 运行所有测试
+pytest
+
+# 运行并显示覆盖率
+pytest --cov=app --cov-report=html
+
+# 运行特定测试
+pytest tests/test_auth.py
+```
+
+**前端测试**：
+```bash
+cd frontend
+
+# 运行所有测试
+npm test
+
+# 监听模式
+npm run test:watch
+
+# 覆盖率
+npm run test:coverage
+```
+
+详细测试说明请参考 [tests/README.md](tests/README.md) 和 [tests/TEST_COVERAGE.md](tests/TEST_COVERAGE.md)
+
 ## API接口
 
 ### 租户管理

@@ -4,27 +4,26 @@ __pycache__/
 *$py.class
 *.so
 .Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-
-# Virtual Environment
-.venv/
+env/
 venv/
 ENV/
-env/
+.venv
+pip-log.txt
+pip-delete-this-directory.txt
+.pytest_cache/
+.coverage
+htmlcov/
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
 
 # IDE
 .vscode/
@@ -33,17 +32,52 @@ env/
 *.swo
 *~
 
-# Database
+# 环境变量
+.env
+.env.local
+.env.*.local
+
+# 日志
+*.log
+logs/
+
+# 数据库
 *.db
 *.sqlite
 *.sqlite3
 
-# Logs
-*.log
+# 存储（运行时数据）
+storage/*
+!storage/.gitkeep
+vector_store/*
+!vector_store/.gitkeep
 
-# Environment variables
-.env
-.env.local
+# 文档
+docs/
+*.md
+!README.md
 
-# Test data initialization script (not committed to repo)
-scripts/init_test_data.py
+# Docker
+docker-compose.override.yml
+
+# 测试
+.coverage
+.pytest_cache/
+htmlcov/
+*.cover
+.hypothesis/
+.pytest_cache/
+coverage.xml
+*.cover
+.hypothesis/
+.tox/
+coverage/
+.coverage.*
+.cache
+nosetests.xml
+test-results/
+junit.xml
+
+# Frontend test
+frontend/coverage/
+frontend/.vitest/
