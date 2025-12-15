@@ -56,6 +56,10 @@ vector_store/*
 docs/
 *.md
 !README.md
+!docs/DESIGN.md
+!docs/ASSUMPTIONS.md
+!docs/INSTALLATION.md
+!docs/*.md
 
 # Docker
 docker-compose.override.yml
